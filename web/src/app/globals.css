@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Leaflet renders into a plain div; make sure it fills its container. */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #0b1220;
+}

@@ -1,0 +1,155 @@
+"use client";
+
+import { useState } from "react";
+
+import type { CommunityReport, ConfirmedSite } from "@/lib/types";
+
+/**
+ * Site detail panel with the before/after reveal — the key visual moment
+ * of the demo. When Earth Engine thumbnails exist they're shown with a
+ * wipe slider; otherwise labelled placeholders keep the flow demoable.
+ */
+export default function SitePanel({
+  site,
+  reports,
+  onClose,
+}: {
+  site: ConfirmedSite;
+  reports: CommunityReport[];
+  onClose: () => void;
+}) {
+  const [wipe, setWipe] = useState(50);
+  const hasImagery = Boolean(site.beforeImageUrl && site.afterImageUrl);
+
+  return (
+    <div className="absolute right-4 top-4 z-[1000] w-96 max-w-[calc(100%-2rem)] rounded-xl border border-slate-700 bg-slate-950/95 shadow-2xl backdrop-blur">
+      <div className="flex items-start justify-between border-b border-slate-800 p-4">
+        <div>
+          <h3 className="font-semibold text-white">{site.name}</h3>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Detected {new Date(site.detectedAt).toLocaleDateString()} ·{" "}
+            {site.areaHa != null ? `${site.areaHa} ha · ` : ""}
+            source: {site.detectionSource}
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close site panel"
+          className="rounded-md px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          Before / after (~3 months)
+        </p>
+
+        <div className="relative h-48 overflow-hidden rounded-lg border border-slate-700">
+          {hasImagery ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={site.beforeImageUrl!}
+                alt="Before — Sentinel-2"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <div
+                className="absolute inset-0 overflow-hidden"
+                style={{ clipPath: `inset(0 0 0 ${wipe}%)` }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={site.afterImageUrl!}
+                  alt="After — Sentinel-2"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "radial-gradient(circle at 30% 40%, #14532d, #166534 45%, #15803d 75%)",
+                }}
+              />
+              <div
+                className="absolute inset-0 overflow-hidden"
+                style={{ clipPath: `inset(0 0 0 ${wipe}%)` }}
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 60% 50%, #a16207, #854d0e 40%, #713f12 80%)",
+                  }}
+                />
+              </div>
+              <span className="absolute bottom-1.5 left-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-emerald-200">
+                BEFORE · vegetation
+              </span>
+              <span className="absolute bottom-1.5 right-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-amber-200">
+                AFTER · bare ground
+              </span>
+            </>
+          )}
+          <div
+            className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/80"
+            style={{ left: `${wipe}%` }}
+          />
+        </div>
+
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={wipe}
+          onChange={(e) => setWipe(Number(e.target.value))}
+          aria-label="Before/after comparison slider"
+          className="mt-2 w-full accent-emerald-500"
+        />
+        {!hasImagery && (
+          <p className="mt-1 text-[11px] text-slate-500">
+            Illustrative placeholder — Sentinel-2 thumbnails attach here once
+            the pipeline runs against Earth Engine.
+          </p>
+        )}
+
+        {site.ndwiDrop != null && (
+          <p className="mt-3 rounded-md border border-sky-900/60 bg-sky-950/40 p-2.5 text-xs text-sky-200">
+            Water turbidity check: NDWI dropped{" "}
+            <b>{site.ndwiDrop.toFixed(2)}</b> over nearby river pixels —
+            independent corroboration of the land-cover change.
+          </p>
+        )}
+
+        <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          Linked community reports ({reports.length})
+        </p>
+        {reports.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            No community reports linked to this site yet.
+          </p>
+        ) : (
+          <ul className="flex max-h-32 flex-col gap-2 overflow-y-auto">
+            {reports.map((report) => (
+              <li
+                key={report.id}
+                className="rounded-md border border-slate-800 bg-slate-900 p-2 text-xs text-slate-300"
+              >
+                “{report.message}”
+                <span className="mt-1 block text-[10px] text-slate-500">
+                  {report.locality} ·{" "}
+                  {new Date(report.createdAt).toLocaleDateString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Builds
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment & secrets — never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*service-account*.json
+ee-credentials*
+
+# Pipeline outputs (regenerable)
+pipeline/out/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

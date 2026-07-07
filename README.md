@@ -13,6 +13,26 @@ Illegal mining (*galamsey*) is one of Ghana's most urgent environmental crises. 
 
 We don't just detect galamsey after the damage is done — we **predict where it's going to spread next**, using free satellite land-cover data, community reports, and a transparent risk model.
 
+## Quickstart
+
+```bash
+# Dashboard (works immediately — no config needed, runs in demo mode)
+cd web
+npm install
+npm run dev        # http://localhost:3000
+
+# Connect live data: copy web/.env.example → web/.env.local, fill in
+# Supabase keys, and run supabase/migrations + supabase/seed.sql once.
+
+# Pipeline (needs Earth Engine access)
+cd pipeline
+pip install -r requirements.txt
+earthengine authenticate
+python run_pipeline.py --basin pra --dry-run
+```
+
+Repository layout and the purpose of every file: see [project_breakdown.md](project_breakdown.md).
+
 ## Scope
 
 ### In scope (MVP)
