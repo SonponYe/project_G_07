@@ -5,14 +5,17 @@
 -- or paste into the Supabase SQL editor.
 
 -- ── Confirmed sites ───────────────────────────────────────────────────────
+-- water_corroborated follows NDWI_DROP_THRESHOLD (-0.02 in pipeline/config.py):
+-- true only when ndwi_drop is present and below that threshold. The
+-- community-only site has no satellite water check, so it's false, not null.
 insert into public.confirmed_sites
-  (id, name, lat, lng, area_ha, detected_at, detection_source, ndwi_drop, basin)
+  (id, name, lat, lng, area_ha, detected_at, detection_source, ndwi_drop, water_corroborated, basin)
 values
-  ('a1000000-0000-4000-8000-000000000001', 'Twifo Praso North',   5.6410, -1.5490, 14.2, now() - interval '9 days',  'both',      -0.21, 'pra'),
-  ('a1000000-0000-4000-8000-000000000002', 'Daboase Riverbend',   5.1620, -1.6630,  8.7, now() - interval '21 days', 'satellite', -0.14, 'pra'),
-  ('a1000000-0000-4000-8000-000000000003', 'Beposo Floodplain',   5.0710, -1.6180, 22.5, now() - interval '34 days', 'satellite', -0.29, 'pra'),
-  ('a1000000-0000-4000-8000-000000000004', 'Kyekyewere Tributary',5.7830, -1.4720,  5.1, now() - interval '5 days',  'community', null,  'pra'),
-  ('a1000000-0000-4000-8000-000000000005', 'Assin Praso West',    5.9720, -1.3910, 11.8, now() - interval '15 days', 'both',      -0.18, 'pra');
+  ('a1000000-0000-4000-8000-000000000001', 'Twifo Praso North',   5.6410, -1.5490, 14.2, now() - interval '9 days',  'both',      -0.21, true,  'pra'),
+  ('a1000000-0000-4000-8000-000000000002', 'Daboase Riverbend',   5.1620, -1.6630,  8.7, now() - interval '21 days', 'satellite', -0.14, true,  'pra'),
+  ('a1000000-0000-4000-8000-000000000003', 'Beposo Floodplain',   5.0710, -1.6180, 22.5, now() - interval '34 days', 'satellite', -0.29, true,  'pra'),
+  ('a1000000-0000-4000-8000-000000000004', 'Kyekyewere Tributary',5.7830, -1.4720,  5.1, now() - interval '5 days',  'community', null,  false, 'pra'),
+  ('a1000000-0000-4000-8000-000000000005', 'Assin Praso West',    5.9720, -1.3910, 11.8, now() - interval '15 days', 'both',      -0.18, true,  'pra');
 
 -- ── Community reports (phone numbers are HMAC hashes, never raw) ──────────
 insert into public.community_reports
