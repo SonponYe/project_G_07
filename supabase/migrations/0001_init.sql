@@ -18,8 +18,14 @@ create table public.confirmed_sites (
   detection_source text not null default 'satellite'
                    check (detection_source in ('satellite', 'community', 'both')),
   ndwi_drop        double precision,          -- turbidity corroboration signal
-  before_image_url text,                      -- Earth Engine thumb (before window)
-  after_image_url  text,                      -- Earth Engine thumb (after window)
+  water_corroborated boolean not null default false,
+                   -- true only if ndwi_drop is present AND below the noise
+                   -- threshold (NDWI_DROP_THRESHOLD in pipeline/config.py).
+                   -- A missing reading or a rise/flat reading is NOT
+                   -- corroboration — don't treat "ndwi_drop is not null"
+                   -- as confirmation anywhere downstream.
+  before_image_url text,                      -- permanent Supabase Storage URL (before window)
+  after_image_url  text,                      -- permanent Supabase Storage URL (after window)
   basin            text not null default 'pra',
   created_at       timestamptz not null default now()
 );
