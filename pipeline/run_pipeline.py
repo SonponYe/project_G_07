@@ -79,6 +79,11 @@ def main() -> None:
     parser.add_argument("--basin", default=config.DEFAULT_BASIN, choices=config.BASINS)
     parser.add_argument("--dry-run", action="store_true", help="write out/ files, no DB")
     parser.add_argument("--skip-detect", action="store_true", help="risk grid only")
+    parser.add_argument(
+        "--limit", type=int, default=None,
+        help="only process the first N detected sites — use for a small live "
+             "test push before running the full basin",
+    )
     args = parser.parse_args()
 
     # Load secrets from repo-root .env (never hardcoded).
@@ -94,6 +99,10 @@ def main() -> None:
         print(f"[1/3] Detecting land-cover change in {args.basin}…")
         sites = detect.detect_change(args.basin)
         print(f"      {len(sites)} candidate site(s) found")
+
+        if args.limit is not None:
+            sites = sites[: args.limit]
+            print(f"      --limit set: only processing {len(sites)} of them")
 
         print("[2/3] Cross-checking river turbidity (NDWI)…")
         for site in sites:
