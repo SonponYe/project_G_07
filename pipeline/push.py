@@ -89,6 +89,11 @@ def push_sites(client: Client, sites: list[dict]) -> int:
             f"{site['basin']}/{site_id}_after.png",
             after_bytes,
         )
+        # New automated detections need a human officer to publish or
+        # reject them from /admin — see 0002_roles_and_moderation.sql.
+        # A satellite flag or auto-corroborated SMS match is evidence,
+        # not proof; mislabeling a farm as a mine in public is a real risk.
+        site["review_status"] = "pending_review"
 
         client.table("confirmed_sites").insert(site).execute()
         inserted += 1

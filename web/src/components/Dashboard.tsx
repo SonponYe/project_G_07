@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 
+import type { Viewer } from "@/lib/auth";
+import { exportHighRiskGeoJSON, exportSitesGeoJSON } from "@/lib/export";
 import type { ConfirmedSite, DashboardData, LayerVisibility } from "@/lib/types";
 
 import LayerControls from "./LayerControls";
@@ -19,7 +21,13 @@ const MapView = dynamic(() => import("./MapView"), {
   ),
 });
 
-export default function Dashboard({ initial }: { initial: DashboardData }) {
+export default function Dashboard({
+  initial,
+  viewer,
+}: {
+  initial: DashboardData;
+  viewer: Viewer | null;
+}) {
   const [layers, setLayers] = useState<LayerVisibility>({
     sites: true,
     reports: true,
@@ -62,6 +70,18 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
           <span className="text-slate-300">
             <b className="text-orange-400">{stats.highRisk}</b> high-risk zones
           </span>
+          {viewer && (viewer.role === "officer" || viewer.role === "admin") ? (
+            <a
+              href="/admin"
+              className="rounded-md border border-emerald-700 px-2.5 py-1 font-medium text-emerald-300 hover:bg-emerald-950"
+            >
+              Moderation queue
+            </a>
+          ) : (
+            <a href="/login" className="text-slate-500 hover:text-slate-300">
+              Officer sign in
+            </a>
+          )}
         </div>
       </header>
 
@@ -69,6 +89,26 @@ export default function Dashboard({ initial }: { initial: DashboardData }) {
         <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-slate-800 bg-slate-950 p-4">
           <LayerControls layers={layers} onChange={setLayers} />
           <Legend />
+
+          <section className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Export
+            </h2>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => exportSitesGeoJSON(initial.sites)}
+                className="rounded-md border border-slate-700 px-2.5 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-800"
+              >
+                Confirmed sites (GeoJSON)
+              </button>
+              <button
+                onClick={() => exportHighRiskGeoJSON(initial.riskCells, 0.5)}
+                className="rounded-md border border-slate-700 px-2.5 py-1.5 text-left text-xs text-slate-300 hover:bg-slate-800"
+              >
+                High-risk zones ≥50% (GeoJSON)
+              </button>
+            </div>
+          </section>
           <div className="mt-auto rounded-lg border border-slate-800 bg-slate-900 p-3 text-xs leading-relaxed text-slate-400">
             <p className="mb-1 font-medium text-slate-300">Report a site by SMS</p>
             <p>

@@ -1,0 +1,159 @@
+"use client";
+
+import { useTransition } from "react";
+
+import { setReportStatus, setSiteReview, signOutAction } from "./actions";
+
+interface PendingSite {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  areaHa: number | null;
+  detectionSource: string;
+  waterCorroborated: boolean;
+  detectedAt: string;
+}
+
+interface PendingReport {
+  id: string;
+  message: string;
+  locality: string | null;
+  createdAt: string;
+}
+
+export default function AdminQueue({
+  viewerEmail,
+  sites,
+  reports,
+}: {
+  viewerEmail: string;
+  sites: PendingSite[];
+  reports: PendingReport[];
+}) {
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <div className="mx-auto max-w-4xl px-6 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-white">Moderation queue</h1>
+          <p className="text-xs text-slate-400">Signed in as {viewerEmail}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <a href="/" className="text-xs text-slate-400 hover:text-white">
+            ← Back to dashboard
+          </a>
+          <form action={signOutAction}>
+            <button className="rounded-md border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <section className="mb-8">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+          New detections awaiting review ({sites.length})
+        </h2>
+        {sites.length === 0 ? (
+          <p className="text-sm text-slate-500">Nothing pending — queue is clear.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {sites.map((site) => (
+              <li
+                key={site.id}
+                className="rounded-lg border border-slate-800 bg-slate-900 p-4"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-white">{site.name}</p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      {site.lat.toFixed(4)}, {site.lng.toFixed(4)} ·{" "}
+                      {site.areaHa != null ? `${site.areaHa} ha · ` : ""}
+                      source: {site.detectionSource} ·{" "}
+                      {site.waterCorroborated
+                        ? "NDWI corroborated"
+                        : "no water corroboration"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Detected {new Date(site.detectedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      disabled={isPending}
+                      onClick={() =>
+                        startTransition(() => setSiteReview(site.id, "published"))
+                      }
+                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      Publish
+                    </button>
+                    <button
+                      disabled={isPending}
+                      onClick={() =>
+                        startTransition(() => setSiteReview(site.id, "rejected"))
+                      }
+                      className="rounded-md border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-950"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+          Pending community reports ({reports.length})
+        </h2>
+        {reports.length === 0 ? (
+          <p className="text-sm text-slate-500">Nothing pending.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {reports.map((report) => (
+              <li
+                key={report.id}
+                className="rounded-lg border border-slate-800 bg-slate-900 p-4"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-slate-200">“{report.message}”</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {report.locality ?? "unknown locality"} ·{" "}
+                      {new Date(report.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      disabled={isPending}
+                      onClick={() =>
+                        startTransition(() => setReportStatus(report.id, "confirmed"))
+                      }
+                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      disabled={isPending}
+                      onClick={() =>
+                        startTransition(() => setReportStatus(report.id, "rejected"))
+                      }
+                      className="rounded-md border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-950"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}

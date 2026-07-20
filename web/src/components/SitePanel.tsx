@@ -119,10 +119,25 @@ export default function SitePanel({
         )}
 
         {site.ndwiDrop != null && (
-          <p className="mt-3 rounded-md border border-sky-900/60 bg-sky-950/40 p-2.5 text-xs text-sky-200">
-            Water turbidity check: NDWI dropped{" "}
-            <b>{site.ndwiDrop.toFixed(2)}</b> over nearby river pixels —
-            independent corroboration of the land-cover change.
+          <p
+            className={
+              site.waterCorroborated
+                ? "mt-3 rounded-md border border-sky-900/60 bg-sky-950/40 p-2.5 text-xs text-sky-200"
+                : "mt-3 rounded-md border border-slate-800 bg-slate-900 p-2.5 text-xs text-slate-400"
+            }
+          >
+            Water turbidity check: NDWI changed{" "}
+            <b>{site.ndwiDrop.toFixed(2)}</b> over nearby river pixels.{" "}
+            {site.waterCorroborated
+              ? "Past the noise threshold — independent corroboration of the land-cover change."
+              : "Within normal noise — not treated as corroboration."}
+          </p>
+        )}
+
+        {site.officerNotes && (
+          <p className="mt-3 rounded-md border border-slate-700 bg-slate-900 p-2.5 text-xs text-slate-300">
+            <span className="font-medium text-slate-400">Officer note:</span>{" "}
+            {site.officerNotes}
           </p>
         )}
 

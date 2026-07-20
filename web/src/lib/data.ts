@@ -32,8 +32,11 @@ export async function getDashboardData(): Promise<DashboardData> {
       supabase
         .from("confirmed_sites")
         .select(
-          "id,name,lat,lng,area_ha,detected_at,detection_source,ndwi_drop,before_image_url,after_image_url,basin"
+          "id,name,lat,lng,area_ha,detected_at,detection_source,ndwi_drop,water_corroborated,review_status,officer_notes,before_image_url,after_image_url,basin"
         )
+        // RLS already restricts anon reads to review_status='published',
+        // but scope explicitly so intent is clear from the query alone.
+        .eq("review_status", "published")
         .order("detected_at", { ascending: false }),
       supabase
         .from("community_reports")
@@ -85,6 +88,9 @@ function mapSite(row: any): ConfirmedSite {
     detectedAt: row.detected_at,
     detectionSource: row.detection_source,
     ndwiDrop: row.ndwi_drop,
+    waterCorroborated: row.water_corroborated ?? false,
+    reviewStatus: row.review_status ?? "published",
+    officerNotes: row.officer_notes ?? null,
     beforeImageUrl: row.before_image_url,
     afterImageUrl: row.after_image_url,
     basin: row.basin,

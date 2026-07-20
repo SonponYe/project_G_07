@@ -1,5 +1,6 @@
 export type DetectionSource = "satellite" | "community" | "both";
 export type ReportStatus = "pending" | "confirmed" | "rejected";
+export type ReviewStatus = "pending_review" | "published" | "rejected";
 
 export interface ConfirmedSite {
   id: string;
@@ -10,6 +11,12 @@ export interface ConfirmedSite {
   detectedAt: string;
   detectionSource: DetectionSource;
   ndwiDrop: number | null;
+  /** True only when ndwiDrop is present and past the noise threshold —
+   * see NDWI_DROP_THRESHOLD in pipeline/config.py. A missing or flat/rising
+   * reading is NOT corroboration. */
+  waterCorroborated: boolean;
+  reviewStatus: ReviewStatus;
+  officerNotes: string | null;
   beforeImageUrl: string | null;
   afterImageUrl: string | null;
   basin: string;
