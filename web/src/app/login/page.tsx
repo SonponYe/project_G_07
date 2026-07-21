@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { IconChevronLeft } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -104,9 +105,10 @@ export default function LoginPage() {
 
           <a
             href="/"
-            className="mt-5 block text-center text-xs text-neutral-600 hover:text-gold-500"
+            className="mt-5 flex items-center justify-center gap-1 text-center text-xs text-neutral-600 hover:text-gold-500"
           >
-            ← Back to the public dashboard
+            <IconChevronLeft className="h-3 w-3" />
+            Back to the public dashboard
           </a>
         </div>
       </div>

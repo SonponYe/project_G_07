@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 
+import { IconChevronLeft } from "@/components/icons";
+
 import { setReportStatus, setSiteReview, signOutAction } from "./actions";
 
 interface PendingSite {
@@ -44,8 +46,12 @@ export default function AdminQueue({
           <p className="text-xs text-neutral-500">Signed in as {viewerEmail}</p>
         </div>
         <div className="flex items-center gap-3">
-          <a href="/" className="text-xs text-neutral-500 hover:text-gold-400">
-            ← Public dashboard
+          <a
+            href="/"
+            className="flex items-center gap-1 text-xs text-neutral-500 hover:text-gold-400"
+          >
+            <IconChevronLeft className="h-3 w-3" />
+            Public dashboard
           </a>
           <form action={signOutAction}>
             <button className="rounded-md border border-ink-700 px-3 py-1.5 text-xs text-neutral-300 hover:border-gold-700 hover:text-gold-300">

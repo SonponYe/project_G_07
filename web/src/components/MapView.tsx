@@ -12,6 +12,8 @@ import type {
   RiskCell,
 } from "@/lib/types";
 
+import { IconLocate } from "./icons";
+
 interface MapViewProps {
   sites: ConfirmedSite[];
   reports: CommunityReport[];
@@ -256,9 +258,10 @@ export default function MapView({
       <button
         onClick={handleLocate}
         disabled={locating}
-        className="absolute bottom-6 right-4 z-[1000] rounded-full border border-[#3a2f12] bg-black/90 px-3 py-2 text-xs font-medium text-[#e5c158] shadow-lg backdrop-blur hover:bg-black disabled:opacity-60"
+        className="absolute bottom-6 right-4 z-[1000] flex items-center gap-1.5 rounded-full border border-[#3a2f12] bg-black/90 px-3 py-2 text-xs font-medium text-[#e5c158] shadow-lg backdrop-blur hover:bg-black disabled:opacity-60"
       >
-        {locating ? "Locating…" : "📍 Locate me"}
+        <IconLocate className="h-3.5 w-3.5" />
+        {locating ? "Locating…" : "Locate me"}
       </button>
 
       {locateError && (

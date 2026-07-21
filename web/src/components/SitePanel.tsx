@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import type { CommunityReport, ConfirmedSite } from "@/lib/types";
 
+import { IconClose } from "./icons";
+
 /**
  * Site detail panel with the before/after reveal — the key visual moment
  * of the demo. When Earth Engine thumbnails exist they're shown with a
@@ -35,9 +37,9 @@ export default function SitePanel({
         <button
           onClick={onClose}
           aria-label="Close site panel"
-          className="rounded-md px-2 py-1 text-neutral-400 hover:bg-ink-800 hover:text-white"
+          className="rounded-md p-1.5 text-neutral-400 hover:bg-ink-800 hover:text-white"
         >
-          ✕
+          <IconClose className="h-4 w-4" />
         </button>
       </div>
 

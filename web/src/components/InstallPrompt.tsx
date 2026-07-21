@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { IconClose } from "./icons";
+
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -91,9 +93,9 @@ export default function InstallPrompt() {
         <button
           onClick={dismiss}
           aria-label="Dismiss install prompt"
-          className="text-neutral-500 hover:text-neutral-300"
+          className="rounded-md p-1 text-neutral-500 hover:text-neutral-300"
         >
-          ✕
+          <IconClose className="h-4 w-4" />
         </button>
       </div>
     </div>
