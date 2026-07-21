@@ -1,8 +1,25 @@
 @import "tailwindcss";
 
+@theme {
+  --color-ink-950: #0a0a0a;
+  --color-ink-900: #121110;
+  --color-ink-850: #17150f;
+  --color-ink-800: #1c1a14;
+  --color-ink-700: #2a2620;
+  --color-ink-600: #3a3428;
+
+  --color-gold-950: #2a2210;
+  --color-gold-800: #6b551c;
+  --color-gold-700: #8a6d21;
+  --color-gold-600: #b8942c;
+  --color-gold-500: #d4af37;
+  --color-gold-400: #e5c158;
+  --color-gold-300: #f2d675;
+}
+
 :root {
-  --background: #0b1220;
-  --foreground: #e2e8f0;
+  --background: var(--color-ink-950);
+  --foreground: #f2ede1;
 }
 
 html,
@@ -21,5 +38,5 @@ body {
 .leaflet-container {
   width: 100%;
   height: 100%;
-  background: #0b1220;
+  background: var(--color-ink-950);
 }

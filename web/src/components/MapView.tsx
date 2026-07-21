@@ -2,8 +2,9 @@
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { haversineKm, nearest } from "@/lib/geo";
 import type {
   CommunityReport,
   ConfirmedSite,
@@ -23,10 +24,10 @@ interface MapViewProps {
 const PRA_CENTER: L.LatLngExpression = [5.55, -1.55];
 
 function riskColor(score: number): string {
-  if (score >= 0.8) return "#dc2626"; // red-600
-  if (score >= 0.65) return "#ea580c"; // orange-600
-  if (score >= 0.5) return "#f59e0b"; // amber-500
-  return "#eab308"; // yellow-500
+  if (score >= 0.8) return "#dc2626"; // red-600 — imminent
+  if (score >= 0.65) return "#e5893a"; // burnt orange
+  if (score >= 0.5) return "#d4af37"; // gold-500
+  return "#8a6d21"; // gold-700, muted
 }
 
 export default function MapView({
@@ -43,7 +44,10 @@ export default function MapView({
     sites: L.LayerGroup;
     reports: L.LayerGroup;
     risk: L.LayerGroup;
+    locate: L.LayerGroup;
   } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
 
   // Create the map once.
   useEffect(() => {
@@ -79,6 +83,7 @@ export default function MapView({
       risk: L.layerGroup().addTo(map),
       sites: L.layerGroup().addTo(map),
       reports: L.layerGroup().addTo(map),
+      locate: L.layerGroup().addTo(map),
     };
     mapRef.current = map;
 
@@ -129,8 +134,8 @@ export default function MapView({
         const confirmed = report.status === "confirmed";
         L.circleMarker([report.lat, report.lng], {
           radius: 6,
-          color: confirmed ? "#dc2626" : "#f59e0b",
-          fillColor: confirmed ? "#ef4444" : "#fbbf24",
+          color: confirmed ? "#dc2626" : "#d4af37",
+          fillColor: confirmed ? "#ef4444" : "#e5c158",
           fillOpacity: 0.85,
           weight: 1.5,
         })
@@ -160,7 +165,109 @@ export default function MapView({
     }
   }, [sites, reports, riskCells, layers, selectedSiteId, onSelectSite]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  function handleLocate() {
+    if (!navigator.geolocation) {
+      setLocateError("Location isn't supported on this device.");
+      return;
+    }
+    setLocating(true);
+    setLocateError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocating(false);
+        const { latitude: lat, longitude: lng, accuracy } = position.coords;
+        const map = mapRef.current;
+        const groups = groupsRef.current;
+        if (!map || !groups) return;
+
+        groups.locate.clearLayers();
+
+        const nearestSite = nearest(
+          { lat, lng },
+          sites,
+          (s) => ({ lat: s.lat, lng: s.lng })
+        );
+        const nearestRisk = nearest(
+          { lat, lng },
+          riskCells,
+          (c) => ({ lat: c.lat, lng: c.lng })
+        );
+        // Highest-scoring risk cell within 15 km — more actionable than
+        // just "nearest cell," which could be a low-risk one right next door.
+        const nearbyHighRisk = riskCells
+          .filter((c) => haversineKm(lat, lng, c.lat, c.lng) <= 15)
+          .sort((a, b) => b.score - a.score)[0];
+
+        const lines = [`<b>You are here</b>`, `Accuracy: ±${Math.round(accuracy)} m`];
+        if (nearestSite) {
+          lines.push(
+            `Nearest reported site: <b>${nearestSite.distanceKm.toFixed(1)} km</b> (${escapeHtml(
+              nearestSite.item.name
+            )})`
+          );
+        }
+        if (nearbyHighRisk) {
+          lines.push(
+            `Highest nearby risk: <b>${(nearbyHighRisk.score * 100).toFixed(0)}%</b> ` +
+              `(${haversineKm(lat, lng, nearbyHighRisk.lat, nearbyHighRisk.lng).toFixed(1)} km away)`
+          );
+        } else if (nearestRisk) {
+          lines.push(`No elevated risk zones within 15 km.`);
+        }
+
+        L.circle([lat, lng], {
+          radius: accuracy,
+          color: "#7dd3fc",
+          fillColor: "#7dd3fc",
+          fillOpacity: 0.15,
+          weight: 1,
+        }).addTo(groups.locate);
+
+        L.circleMarker([lat, lng], {
+          radius: 8,
+          color: "#0a0a0a",
+          fillColor: "#7dd3fc",
+          fillOpacity: 1,
+          weight: 2,
+        })
+          .bindPopup(lines.join("<br/>"))
+          .addTo(groups.locate)
+          .openPopup();
+
+        map.flyTo([lat, lng], 13);
+      },
+      (error) => {
+        setLocating(false);
+        setLocateError(
+          error.code === error.PERMISSION_DENIED
+            ? "Location permission denied."
+            : "Couldn't get your location. Try again."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10_000 }
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+
+      <button
+        onClick={handleLocate}
+        disabled={locating}
+        className="absolute bottom-6 right-4 z-[1000] rounded-full border border-[#3a2f12] bg-black/90 px-3 py-2 text-xs font-medium text-[#e5c158] shadow-lg backdrop-blur hover:bg-black disabled:opacity-60"
+      >
+        {locating ? "Locating…" : "📍 Locate me"}
+      </button>
+
+      {locateError && (
+        <div className="absolute bottom-20 right-4 z-[1000] max-w-[220px] rounded-md border border-red-900 bg-black/90 px-3 py-2 text-xs text-red-300 shadow-lg">
+          {locateError}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function fmt(value: number | undefined): string {

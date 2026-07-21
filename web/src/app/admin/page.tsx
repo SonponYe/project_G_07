@@ -8,7 +8,7 @@ import AdminQueue from "./AdminQueue";
 export default async function AdminPage() {
   if (!supabaseConfigured()) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-center text-sm text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-ink-950 px-4 text-center text-sm text-neutral-400">
         Moderation requires a configured Supabase project.
       </div>
     );
@@ -20,7 +20,7 @@ export default async function AdminPage() {
   }
   if (!isOfficer(viewer)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-center text-sm text-slate-400">
+      <div className="flex min-h-screen items-center justify-center bg-ink-950 px-4 text-center text-sm text-neutral-400">
         Signed in as {viewer.email}, but this account isn&apos;t an officer.
         Contact an administrator to request access.
       </div>
@@ -43,7 +43,8 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-ink-950">
+      <div className="h-1 w-full bg-gradient-to-r from-gold-700 via-gold-400 to-gold-700" />
       <AdminQueue
         viewerEmail={viewer.email}
         sites={(sitesRes.data ?? []).map((s) => ({

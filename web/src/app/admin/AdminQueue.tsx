@@ -37,15 +37,18 @@ export default function AdminQueue({
     <div className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Moderation queue</h1>
-          <p className="text-xs text-slate-400">Signed in as {viewerEmail}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-gold-600">
+            Authority Portal
+          </p>
+          <h1 className="text-xl font-semibold text-gold-300">Moderation queue</h1>
+          <p className="text-xs text-neutral-500">Signed in as {viewerEmail}</p>
         </div>
         <div className="flex items-center gap-3">
-          <a href="/" className="text-xs text-slate-400 hover:text-white">
-            ← Back to dashboard
+          <a href="/" className="text-xs text-neutral-500 hover:text-gold-400">
+            ← Public dashboard
           </a>
           <form action={signOutAction}>
-            <button className="rounded-md border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800">
+            <button className="rounded-md border border-ink-700 px-3 py-1.5 text-xs text-neutral-300 hover:border-gold-700 hover:text-gold-300">
               Sign out
             </button>
           </form>
@@ -53,22 +56,22 @@ export default function AdminQueue({
       </div>
 
       <section className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-neutral-500">
           New detections awaiting review ({sites.length})
         </h2>
         {sites.length === 0 ? (
-          <p className="text-sm text-slate-500">Nothing pending — queue is clear.</p>
+          <p className="text-sm text-neutral-600">Nothing pending — queue is clear.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {sites.map((site) => (
               <li
                 key={site.id}
-                className="rounded-lg border border-slate-800 bg-slate-900 p-4"
+                className="rounded-lg border border-ink-700 bg-ink-900 p-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium text-white">{site.name}</p>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="font-medium text-neutral-100">{site.name}</p>
+                    <p className="mt-0.5 text-xs text-neutral-400">
                       {site.lat.toFixed(4)}, {site.lng.toFixed(4)} ·{" "}
                       {site.areaHa != null ? `${site.areaHa} ha · ` : ""}
                       source: {site.detectionSource} ·{" "}
@@ -76,7 +79,7 @@ export default function AdminQueue({
                         ? "NDWI corroborated"
                         : "no water corroboration"}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-neutral-600">
                       Detected {new Date(site.detectedAt).toLocaleDateString()}
                     </p>
                   </div>
@@ -86,7 +89,7 @@ export default function AdminQueue({
                       onClick={() =>
                         startTransition(() => setSiteReview(site.id, "published"))
                       }
-                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                      className="rounded-md bg-gold-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-gold-400 disabled:opacity-50"
                     >
                       Publish
                     </button>
@@ -108,22 +111,22 @@ export default function AdminQueue({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-400">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-neutral-500">
           Pending community reports ({reports.length})
         </h2>
         {reports.length === 0 ? (
-          <p className="text-sm text-slate-500">Nothing pending.</p>
+          <p className="text-sm text-neutral-600">Nothing pending.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {reports.map((report) => (
               <li
                 key={report.id}
-                className="rounded-lg border border-slate-800 bg-slate-900 p-4"
+                className="rounded-lg border border-ink-700 bg-ink-900 p-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm text-slate-200">“{report.message}”</p>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="text-sm text-neutral-200">“{report.message}”</p>
+                    <p className="mt-0.5 text-xs text-neutral-600">
                       {report.locality ?? "unknown locality"} ·{" "}
                       {new Date(report.createdAt).toLocaleDateString()}
                     </p>
@@ -134,7 +137,7 @@ export default function AdminQueue({
                       onClick={() =>
                         startTransition(() => setReportStatus(report.id, "confirmed"))
                       }
-                      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                      className="rounded-md bg-gold-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-gold-400 disabled:opacity-50"
                     >
                       Confirm
                     </button>

@@ -9,7 +9,7 @@ const LAYER_LABELS: Record<keyof LayerVisibility, { label: string; hint: string 
   },
   reports: {
     label: "Community reports",
-    hint: "SMS reports — yellow pending, red confirmed",
+    hint: "SMS reports — gold pending, red confirmed",
   },
   risk: {
     label: "Risk heatmap",
@@ -25,27 +25,27 @@ export default function LayerControls({
   onChange: (layers: LayerVisibility) => void;
 }) {
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+    <section className="rounded-lg border border-ink-700 bg-ink-900 p-3">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold-600">
         Map layers
       </h2>
       <div className="flex flex-col gap-2">
         {(Object.keys(LAYER_LABELS) as (keyof LayerVisibility)[]).map((key) => (
           <label
             key={key}
-            className="flex cursor-pointer items-start gap-2.5 rounded-md p-1.5 hover:bg-slate-800/60"
+            className="flex cursor-pointer items-start gap-2.5 rounded-md p-1.5 hover:bg-ink-800"
           >
             <input
               type="checkbox"
               checked={layers[key]}
               onChange={() => onChange({ ...layers, [key]: !layers[key] })}
-              className="mt-0.5 h-4 w-4 accent-emerald-500"
+              className="mt-0.5 h-4 w-4 accent-gold-500"
             />
             <span>
-              <span className="block text-sm text-slate-200">
+              <span className="block text-sm text-neutral-200">
                 {LAYER_LABELS[key].label}
               </span>
-              <span className="block text-xs text-slate-500">
+              <span className="block text-xs text-neutral-500">
                 {LAYER_LABELS[key].hint}
               </span>
             </span>

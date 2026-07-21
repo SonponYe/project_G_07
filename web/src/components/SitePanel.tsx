@@ -22,11 +22,11 @@ export default function SitePanel({
   const hasImagery = Boolean(site.beforeImageUrl && site.afterImageUrl);
 
   return (
-    <div className="absolute right-4 top-4 z-[1000] w-96 max-w-[calc(100%-2rem)] rounded-xl border border-slate-700 bg-slate-950/95 shadow-2xl backdrop-blur">
-      <div className="flex items-start justify-between border-b border-slate-800 p-4">
+    <div className="absolute right-4 top-4 z-[1000] w-96 max-w-[calc(100%-2rem)] rounded-xl border border-ink-700 bg-black/95 shadow-2xl backdrop-blur">
+      <div className="flex items-start justify-between border-b border-ink-700 p-4">
         <div>
-          <h3 className="font-semibold text-white">{site.name}</h3>
-          <p className="mt-0.5 text-xs text-slate-400">
+          <h3 className="font-semibold text-gold-300">{site.name}</h3>
+          <p className="mt-0.5 text-xs text-neutral-400">
             Detected {new Date(site.detectedAt).toLocaleDateString()} ·{" "}
             {site.areaHa != null ? `${site.areaHa} ha · ` : ""}
             source: {site.detectionSource}
@@ -35,18 +35,18 @@ export default function SitePanel({
         <button
           onClick={onClose}
           aria-label="Close site panel"
-          className="rounded-md px-2 py-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+          className="rounded-md px-2 py-1 text-neutral-400 hover:bg-ink-800 hover:text-white"
         >
           ✕
         </button>
       </div>
 
       <div className="p-4">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold-600">
           Before / after (~3 months)
         </p>
 
-        <div className="relative h-48 overflow-hidden rounded-lg border border-slate-700">
+        <div className="relative h-48 overflow-hidden rounded-lg border border-ink-700">
           {hasImagery ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -88,16 +88,16 @@ export default function SitePanel({
                   }}
                 />
               </div>
-              <span className="absolute bottom-1.5 left-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-emerald-200">
+              <span className="absolute bottom-1.5 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-emerald-200">
                 BEFORE · vegetation
               </span>
-              <span className="absolute bottom-1.5 right-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-amber-200">
+              <span className="absolute bottom-1.5 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-gold-300">
                 AFTER · bare ground
               </span>
             </>
           )}
           <div
-            className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/80"
+            className="pointer-events-none absolute inset-y-0 w-0.5 bg-gold-400/80"
             style={{ left: `${wipe}%` }}
           />
         </div>
@@ -109,10 +109,10 @@ export default function SitePanel({
           value={wipe}
           onChange={(e) => setWipe(Number(e.target.value))}
           aria-label="Before/after comparison slider"
-          className="mt-2 w-full accent-emerald-500"
+          className="mt-2 w-full accent-gold-500"
         />
         {!hasImagery && (
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-neutral-500">
             Illustrative placeholder — Sentinel-2 thumbnails attach here once
             the pipeline runs against Earth Engine.
           </p>
@@ -122,8 +122,8 @@ export default function SitePanel({
           <p
             className={
               site.waterCorroborated
-                ? "mt-3 rounded-md border border-sky-900/60 bg-sky-950/40 p-2.5 text-xs text-sky-200"
-                : "mt-3 rounded-md border border-slate-800 bg-slate-900 p-2.5 text-xs text-slate-400"
+                ? "mt-3 rounded-md border border-gold-800 bg-gold-950/40 p-2.5 text-xs text-gold-300"
+                : "mt-3 rounded-md border border-ink-700 bg-ink-900 p-2.5 text-xs text-neutral-400"
             }
           >
             Water turbidity check: NDWI changed{" "}
@@ -135,17 +135,17 @@ export default function SitePanel({
         )}
 
         {site.officerNotes && (
-          <p className="mt-3 rounded-md border border-slate-700 bg-slate-900 p-2.5 text-xs text-slate-300">
-            <span className="font-medium text-slate-400">Officer note:</span>{" "}
+          <p className="mt-3 rounded-md border border-ink-700 bg-ink-900 p-2.5 text-xs text-neutral-300">
+            <span className="font-medium text-gold-500">Officer note:</span>{" "}
             {site.officerNotes}
           </p>
         )}
 
-        <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wider text-gold-600">
           Linked community reports ({reports.length})
         </p>
         {reports.length === 0 ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-neutral-500">
             No community reports linked to this site yet.
           </p>
         ) : (
@@ -153,10 +153,10 @@ export default function SitePanel({
             {reports.map((report) => (
               <li
                 key={report.id}
-                className="rounded-md border border-slate-800 bg-slate-900 p-2 text-xs text-slate-300"
+                className="rounded-md border border-ink-700 bg-ink-900 p-2 text-xs text-neutral-300"
               >
                 “{report.message}”
-                <span className="mt-1 block text-[10px] text-slate-500">
+                <span className="mt-1 block text-[10px] text-neutral-500">
                   {report.locality} ·{" "}
                   {new Date(report.createdAt).toLocaleDateString()}
                 </span>
