@@ -101,16 +101,17 @@ def push_sites(client: Client, sites: list[dict]) -> int:
 
 
 def replace_risk_grid(client: Client, basin: str, rows: list[dict]) -> int:
-    """Replace the risk grid for a basin atomically-enough for a demo:
-    upsert on (basin, cell_id), then delete stale cells from older runs."""
+    """Replace the risk grid for a basin: delete the old grid, insert the
+    new one. Simpler and more robust than the previous upsert-then-delete-
+    stale-cells approach, which built a NOT IN filter listing every fresh
+    cell_id directly in the URL query string — fine for a handful of
+    cells, but a real basin-sized grid (1000+ cells) blew past the URL
+    length limit and crashed with httpx.InvalidURL."""
+    client.table("risk_scores").delete().eq("basin", basin).execute()
     if rows:
-        client.table("risk_scores").upsert(
-            rows, on_conflict="basin,cell_id"
-        ).execute()
-    fresh_ids = [r["cell_id"] for r in rows]
-    query = client.table("risk_scores").delete().eq("basin", basin)
-    if fresh_ids:
-        id_list = ",".join(f'"{i}"' for i in fresh_ids)
-        query = query.not_.in_("cell_id", f"({id_list})")
-    query.execute()
+        # Payload rides in the request body, not the URL, so batch size
+        # only needs to stay reasonable — not URL-length-constrained.
+        batch_size = 500
+        for i in range(0, len(rows), batch_size):
+            client.table("risk_scores").insert(rows[i : i + batch_size]).execute()
     return len(rows)

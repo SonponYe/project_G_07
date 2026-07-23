@@ -80,11 +80,21 @@ def score_grid(basin_key: str, confirmed_sites: list[dict], slope_lookup=None) -
     # Sanity-clamp: a market signal should nudge, never dominate.
     gold_multiplier = min(max(gold_multiplier, 0.8), 1.3)
 
+    # Step by integer indices rather than repeatedly adding `cell` to a
+    # float accumulator: across a basin-sized bbox that's hundreds of
+    # additions, and the accumulated floating-point drift occasionally
+    # pushes a cell's lat/lng across a rounding boundary, making two
+    # genuinely distinct cells format to the identical cell_id string
+    # (observed: 51 collisions out of 1148 cells on a real Pra run) and
+    # crashing the upsert with a duplicate-key error. Indices are exact.
+    n_lat = int((max_lat - min_lat) / cell)
+    n_lng = int((max_lng - min_lng) / cell)
+
     rows = []
-    lat = min_lat + cell / 2
-    while lat < max_lat:
-        lng = min_lng + cell / 2
-        while lng < max_lng:
+    for i in range(n_lat):
+        lat = min_lat + cell / 2 + i * cell
+        for j in range(n_lng):
+            lng = min_lng + cell / 2 + j * cell
             point = Point(lng, lat)
 
             factors = {
@@ -108,7 +118,14 @@ def score_grid(basin_key: str, confirmed_sites: list[dict], slope_lookup=None) -
                 factors_out["gold_multiplier"] = gold_multiplier
                 rows.append(
                     {
-                        "cell_id": f"{basin_key}_{lat:.2f}_{lng:.2f}",
+                        # Built from the exact integer grid indices, not
+                        # formatted floats: every cell center sits exactly
+                        # on a `.2f` rounding boundary (cell/2 offset with
+                        # a 0.01 cell size means the 3rd decimal is always
+                        # "5"), which binary floating point can round
+                        # either way per-cell — collisions there previously
+                        # crashed the upsert with a duplicate-key error.
+                        "cell_id": f"{basin_key}_{i}_{j}",
                         "basin": basin_key,
                         "lat": round(lat, 4),
                         "lng": round(lng, 4),
@@ -118,7 +135,5 @@ def score_grid(basin_key: str, confirmed_sites: list[dict], slope_lookup=None) -
                         "window_days": config.RISK_WINDOW_DAYS,
                     }
                 )
-            lng += cell
-        lat += cell
 
     return rows

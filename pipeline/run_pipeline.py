@@ -14,9 +14,20 @@ First-time setup:
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Windows defaults stdout to the system codepage (cp1252) instead of UTF-8
+# whenever it isn't a live terminal (piped, redirected, or run in the
+# background) — the arrow/ellipsis characters in the progress messages
+# below then crash the interpreter with UnicodeEncodeError on the last
+# line, after all the real work (and file writes) already succeeded. Force
+# UTF-8 so a run never reports "failed" purely because of a print statement.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 import config
 import risk
