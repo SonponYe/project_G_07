@@ -3,7 +3,10 @@ import type { NextConfig } from "next";
 /**
  * Security headers applied to every response.
  * CSP notes:
- *  - img-src allows OSM/Esri map tiles and Earth Engine thumbnails.
+ *  - img-src allows OSM/Esri map tiles and the Supabase Storage bucket that
+ *    hosts before/after site photos (pipeline re-hosts Earth Engine
+ *    thumbnails there permanently — the browser never loads directly from
+ *    Earth Engine).
  *  - style-src needs 'unsafe-inline' for Leaflet's inline positioning styles.
  *  - connect-src allows the Supabase REST endpoint (read-only anon key + RLS).
  */
@@ -24,7 +27,7 @@ const securityHeaders = [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://earthengine.googleapis.com",
+      "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://*.supabase.co",
       `connect-src 'self' https://*.supabase.co${isDev ? " ws://localhost:* http://localhost:*" : ""}`,
       "font-src 'self'",
       "object-src 'none'",
