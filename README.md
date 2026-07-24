@@ -102,6 +102,9 @@ Next.js frontend reading from Supabase, map rendered with Leaflet or Mapbox GL, 
 - **Person B — Frontend & Map.** Next.js/Supabase reads, Leaflet/Mapbox rendering, all UI layers. Can build against mock data from day 1 without waiting on Person A.
 - **Person C — Community, Predictions & Pitch.** Africa's Talking SMS flow, the risk-scoring heuristic (simple weighted function, not a trained model), and owns the pitch deck/demo script throughout — not just at the end.
 
+--never mind
+this it too simple
+
 ## Three-Week Timeline
 
 ### Week 1 — Foundation & detection
