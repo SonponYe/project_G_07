@@ -2,12 +2,19 @@
 
 **Satellite + community detection and prediction of illegal mining**
 
-Pan-African AI Summit Hackathon 2026 — ClimateTech Track
-Team of 3 · Three-week build window
+Originally built for the Pan-African AI Summit Hackathon 2026 (ClimateTech Track); since extended into a working system with real satellite detections, an officer moderation workflow, and a mobile-first PWA dashboard.
+
+## Status
+
+- **233 real illegal-mining candidate sites** detected from live Google Earth Engine data over the Pra river basin, each with genuine Sentinel-2 before/after imagery and an NDWI water-turbidity cross-check.
+- **1,464-cell predictive risk grid** computed and live.
+- Public dashboard + an authenticated officer moderation portal (`/admin`) both running.
+- Installable as a PWA on phone or desktop; fully responsive with a retractable mobile drawer and bottom-sheet site panel.
+- Deployed via Vercel; source mirrored on both GitHub and GitLab.
 
 ## The Problem
 
-Illegal mining (*galamsey*) is one of Ghana's most urgent environmental crises. It poisons rivers, destroys farmland, and today's detection is almost entirely reactive — authorities and communities only find out after a river has already turned brown or a forest has already been stripped.
+Illegal mining (*galamsey*) is one of Ghana's most urgent environmental crises. It poisons rivers, destroys farmland, and detection is almost entirely reactive — authorities and communities only find out after a river has already turned brown or a forest has already been stripped.
 
 ## The Pitch
 
@@ -22,9 +29,9 @@ npm install
 npm run dev        # http://localhost:3000
 
 # Connect live data: copy web/.env.example → web/.env.local, fill in
-# Supabase keys, and run supabase/migrations + supabase/seed.sql once.
+# Supabase keys, and run supabase/migrations (0001, 0002) + supabase/seed.sql once.
 
-# Pipeline (needs Earth Engine access)
+# Pipeline (needs a Google Earth Engine account)
 cd pipeline
 pip install -r requirements.txt
 earthengine authenticate
@@ -33,121 +40,143 @@ python run_pipeline.py --basin pra --dry-run
 
 Repository layout and the purpose of every file: see [project_breakdown.md](project_breakdown.md).
 
-## Scope
+## How It Works — Five Layers
 
-### In scope (MVP)
+### Layer 1 — Detection
+Queries Google Earth Engine's **Dynamic World** dataset (`GOOGLE/DYNAMICWORLD/V1`) — a continuously updating, 10 m-resolution land-cover classification built on Sentinel-2 imagery, already trained and maintained by Google. Two time slices (~3 months apart) are pulled over the basin, and pixel clusters that flipped from vegetation to bare ground are flagged. Real before/after satellite photos are downloaded for every candidate site and re-hosted permanently in Supabase Storage (Earth Engine's own thumbnail links are ephemeral, so the dashboard never depends on a live Earth Engine call).
 
-- One river basin (Pra, Ankobra, Offin, or Birim — whichever has the clearest before/after satellite signal).
-- Before/after land-cover comparison over a ~3 month window, sourced from an existing pretrained model (no training required).
-- A map dashboard showing confirmed sites, community reports, and a predictive risk heatmap.
-- A simple, explainable weighted-scoring model for predicting expansion — not a trained ML model.
-- Seeded/sample community reports rather than a fully live, production-grade SMS pipeline.
+### Layer 2 — Water corroboration
+Independent evidence: mean NDWI (Normalized Difference Water Index) over a 60 m river buffer near each site, before vs. after. A drop past a fixed noise threshold means the water measurably got more turbid — consistent with sediment runoff from mining — and is stored as `water_corroborated`. A missing or *positive* reading (water got clearer, not muddier) is correctly treated as **not** corroborating, never silently upgraded.
 
-### Out of scope (by design, not a limitation)
+### Layer 3 — Community verification
+Residents text `GALAM <locality> <what they saw>` to an Africa's Talking short code. A report lands as **pending**; it auto-upgrades to **confirmed** when satellite data corroborates it or a second independent sender reports the same spot within ~2 km. Phone numbers are HMAC-hashed before storage — raw numbers are never persisted.
 
-- National coverage — one basin only.
-- A trained/fine-tuned computer vision model — we use Google's existing Dynamic World model as-is.
-- Fully live, production-hardened SMS/USSD reporting at scale.
-- Real-time continuous monitoring — imagery comparison is a periodic snapshot, not live streaming.
+### Layer 4 — Predictive expansion (the differentiator)
+A transparent, explainable weighted score per ~1.1 km grid cell, combining:
 
-## System Architecture
-
-Four layers, building from raw signal to user-facing dashboard:
-
-### Layer 1 — Detection (the core signal)
-Query Google Earth Engine's **Dynamic World** dataset (`GOOGLE/DYNAMICWORLD/V1`) — a continuously updating, 10m-resolution land-cover classification built on Sentinel-2 imagery, already trained and maintained by Google. Two time slices (e.g. 3 months apart) are pulled over the chosen basin, and pixels that flipped from vegetation/trees/crops to bare ground are flagged, especially clusters near a riverbank. This is cross-checked with raw Sentinel-2 bands directly over river pixels — a drop in NDWI (Normalized Difference Water Index) or a shift in red/NIR reflectance indicates rising turbidity, independently corroborating the land-cover flag.
-
-### Layer 2 — Community verification
-Africa's Talking SMS/USSD lets nearby residents confirm or independently report a site. A report creates a **pending (yellow)** marker; it upgrades to **confirmed (red)** when satellite data corroborates it or a second independent report matches. This also serves as the fallback data source if satellite imagery timing doesn't cooperate before demo day.
-
-### Layer 3 — Predictive expansion (the differentiator)
-A transparent, explainable weighted score per grid cell, combining:
-
-- Distance from confirmed sites along the river network (galamsey spreads along tributaries).
+- Distance from confirmed sites (galamsey spreads outward along tributaries).
+- Proximity to the river network.
 - Proximity to forest reserve boundaries with known weak enforcement.
-- Terrain accessibility / slope (mining needs machine access; steep terrain is naturally protected).
-- Optional multiplier: recent gold price trend, a documented correlate of galamsey activity spikes.
+- Terrain accessibility / slope (machines need reachable ground).
+- An optional, clamped gold-price multiplier.
 
-Produces a "risk zone for the next 60 days" heatmap layer. No training data or model fitting required — the scoring logic is fully explainable, which matters more than raw accuracy at this stage.
+No training data, no model fitting — every score's factor breakdown is stored and shown, so it's fully auditable.
 
-### Layer 4 — Dashboard
-Next.js frontend reading from Supabase, map rendered with Leaflet or Mapbox GL, with toggleable layers for confirmed sites, community reports, before/after imagery, and the risk heatmap.
+### Layer 5 — Officer moderation
+New automated detections and auto-corroborated reports land as `pending_review`, **not** immediately public — a satellite flag or an SMS match is evidence, not proof, and mislabeling a farm as a mine in public carries real reputational and legal risk. A signed-in officer reviews the queue at `/admin` and publishes or rejects each one. Enforced at the database level via Postgres Row Level Security, not just hidden in the UI.
+
+## Two Experiences: Public vs. Authority
+
+The same map serves two audiences with different needs, gated by role rather than duplicated code:
+
+- **Public dashboard** (`/`) — open to anyone, no login. Friendly framing, the SMS-reporting card, map layer toggles, and the risk heatmap. Only ever shows `published` sites and non-rejected reports — enforced by Row Level Security, not application logic.
+- **Authority Portal** (`/login`, `/admin`) — officer/admin accounts only (EPA, Forestry Commission, task force staff), provisioned manually, no public self-signup. Adds a moderation queue for new detections and pending reports, GeoJSON export tools, and officer annotation notes on sites.
+
+## Progressive Web App
+
+Installable to a phone home screen or desktop like a native app:
+
+- Custom manifest, service worker (offline app-shell caching, network-only for API routes), and a full icon set built from a minimal gold-reticle mark.
+- A custom install prompt — captures Chrome/Edge/Android's `beforeinstallprompt` event and shows Galamsey Eye's own banner; falls back to manual "Add to Home Screen" instructions on iOS, which has no such API.
+- Dismissal is remembered so it never nags twice.
+
+## Mobile Experience
+
+Rebuilt for phone-first use, since most reporters and many officers will only ever touch this on mobile:
+
+- **Retractable sidebar** — hidden by default on narrow screens, opened via a hamburger control, slides in over a dismissible backdrop. Desktop keeps the original permanent sidebar untouched.
+- **Bottom-sheet site panel** — the before/after photo viewer slides up from the bottom edge on mobile instead of a cramped floating card, with its own scroll and a drag-handle affordance.
+- Compressed header, stacked action buttons in the moderation queue, and touch-sized tap targets throughout.
+
+## Geolocation
+
+A "Locate me" control requests the browser's location on tap (never automatically), drops a distinct marker with an accuracy radius, and reports the distance to the nearest confirmed site and the highest-risk zone within 15 km — turning the abstract risk grid into "how close is this to me."
 
 ## Tech Stack
 
 | Layer | Technology | Notes |
 |---|---|---|
-| Frontend | Next.js 15, TypeScript, Tailwind | |
-| Mapping | Leaflet or Mapbox GL JS | Leaflet is free/simpler; Mapbox GL has nicer heatmap layers if time allows |
-| Backend / DB | Supabase (Postgres) | Tables: `confirmed_sites`, `community_reports`, `risk_scores` |
-| Data pipeline | Python + `earthengine-api` / `geemap` | Runs Earth Engine queries, exports GeoJSON, pushes to Supabase |
-| Satellite data | Google Earth Engine (Dynamic World V1, Sentinel-2) | Free noncommercial tier — register early, approval isn't always instant |
-| Community reports | Africa's Talking SMS/USSD API | Free-tier sandbox for testing |
-| Hosting | Vercel (frontend), Supabase (data) | |
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS v4 | Custom black/gold theme via CSS `@theme` tokens |
+| Mapping | Leaflet | Streets/Satellite base layers, risk heatmap, geolocation control |
+| Auth | Supabase Auth via `@supabase/ssr` | Cookie-based sessions, officer/admin roles, no public signup |
+| Backend / DB | Supabase (Postgres + Storage) | Tables: `confirmed_sites`, `community_reports`, `risk_scores`, `profiles` |
+| Data pipeline | Python + `earthengine-api`, `shapely`, `supabase-py` | Runs Earth Engine queries, uploads imagery, pushes to Supabase |
+| Satellite data | Google Earth Engine (Dynamic World V1, Sentinel-2) | Free noncommercial tier |
+| Community reports | Africa's Talking SMS/USSD API | Constant-time-verified webhook at `/api/reports` |
+| PWA | Web App Manifest + custom service worker | Installable, offline app shell |
+| Hosting | Vercel (frontend), Supabase (data + auth + storage) | Source mirrored on GitHub and GitLab |
+
+## Data Model
+
+Four tables in the `public` schema (see `supabase/migrations/`):
+
+| Table | Purpose |
+|---|---|
+| `confirmed_sites` | Detected/reported mining sites — coordinates, area, before/after image URLs, NDWI corroboration, `review_status` (`pending_review` / `published` / `rejected`), officer notes |
+| `community_reports` | SMS reports — hashed sender, message, locality, status, matched site |
+| `risk_scores` | The predictive grid — one row per cell with score and full factor breakdown |
+| `profiles` | Officer/admin role assignments, linked to Supabase Auth users |
+
+**Security model**, enforced in Postgres, not just the app:
+- RLS gives anonymous/public reads **SELECT only**, and only on `published` sites — no INSERT/UPDATE/DELETE policy exists for public roles.
+- Officers get a narrow, column-scoped UPDATE (`review_status`, `officer_notes`, report `status`) via a `SECURITY DEFINER` role check — never full table access.
+- All other writes (the pipeline, the SMS webhook) use the service-role key, server-side only, never exposed to the browser.
+- Reporter phone numbers are HMAC-SHA256-hashed before storage; the hash column is revoked from the public API entirely.
+- Strict Content-Security-Policy, HTML-escaped user content in map popups, constant-time webhook secret comparison, per-sender rate limiting.
+
+## Repository Structure
+
+See [project_breakdown.md](project_breakdown.md) for a full file-by-file explanation.
+
+```
+project_G_07/
+├── supabase/       Database migrations + seed data
+├── pipeline/       Python detection/scoring pipeline
+└── web/            Next.js dashboard, auth, moderation portal, SMS webhook
+```
+
+## Deployment
+
+The web app deploys to Vercel; Supabase hosts everything else and needs no separate deployment.
+
+1. Push to your Git remote (GitHub and/or GitLab).
+2. In Vercel: New Project → import the repo → set **Root Directory to `web`** (the app isn't at the repo root).
+3. Add environment variables from `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `AT_WEBHOOK_SECRET`, `REPORT_HASH_KEY`.
+4. Deploy. Point Africa's Talking's SMS callback URL at `https://<your-domain>/api/reports?token=<AT_WEBHOOK_SECRET>`.
 
 ## Data Sources & APIs
 
 | Source | What it provides | Access |
 |---|---|---|
-| Dynamic World V1 (Earth Engine) | Near real-time 10m land-cover classification (9 classes incl. bare ground, trees, crops) | Free via Earth Engine noncommercial tier |
-| Sentinel-2 (`COPERNICUS/S2_HARMONIZED`) | Raw multispectral imagery for NDWI/turbidity calculation and visual before/after comparisons | Free via Earth Engine |
-| Africa's Talking | SMS/USSD ingestion for community reports | Free-tier sandbox for testing |
-| Ghana Forestry Commission reserve boundaries | Forest reserve boundary shapefiles, for proximity scoring | Public GIS data — may need manual sourcing/digitizing |
-| Gold price historical data | Optional multiplier for the risk model | Public financial data APIs (e.g. metals-api) or manually sourced historical series |
-| Caravan / historical streamflow (optional) | Background context if judges ask about broader hydrology | Open-source, Google-maintained |
+| Dynamic World V1 (Earth Engine) | 10 m land-cover classification (9 classes incl. bare ground, trees, crops) | Free via Earth Engine noncommercial tier |
+| Sentinel-2 (`COPERNICUS/S2_HARMONIZED`) | Raw multispectral imagery for NDWI and before/after photos | Free via Earth Engine |
+| Africa's Talking | SMS/USSD ingestion for community reports | Sandbox for testing, production tier for real deployment |
+| Ghana Forestry Commission reserve boundaries | Forest reserve boundaries, for proximity scoring | **Still a placeholder** — public GIS data pending manual sourcing |
+| Gold price historical data | Optional multiplier for the risk model | **Still stubbed at neutral (1.0)** — no live feed wired in yet |
 
-## Team Roles
+## What's Still Open
 
-- **Person A — Data & Detection.** Earth Engine pipeline, Dynamic World queries, before/after export to Supabase. Highest-risk, most unfamiliar part — starts day 1, owned solo.
-- **Person B — Frontend & Map.** Next.js/Supabase reads, Leaflet/Mapbox rendering, all UI layers. Can build against mock data from day 1 without waiting on Person A.
-- **Person C — Community, Predictions & Pitch.** Africa's Talking SMS flow, the risk-scoring heuristic (simple weighted function, not a trained model), and owns the pitch deck/demo script throughout — not just at the end.
+- **Forest reserve boundaries** are a labeled placeholder polygon, not official Ghana Forestry Commission data.
+- **Gold-price multiplier** is stubbed neutral; no live market feed connected.
+- **No automated recurring pipeline runs** — every run is manual (`python run_pipeline.py`). Fine for the current cadence (land clearing takes months to show up in a 3-month satellite comparison anyway); a scheduled job (e.g. GitHub Actions cron) would be a small addition later.
+- **Single basin (Pra)** — the config supports two backup basins (Ankobra, Offin) but only Pra has been run for real.
 
---never mind
-this it too simple
+## Origin: Hackathon Scope
 
-## Three-Week Timeline
+<details>
+<summary>Original 3-person, 3-week hackathon plan (kept for reference — the project has since grown past this scope)</summary>
 
-### Week 1 — Foundation & detection
-- **Day 1–2:** Earth Engine signup/approval, Africa's Talking setup, Supabase schema design, pick the river basin.
-- **Day 3–5:** Working Dynamic World query for two time periods over the chosen region; first bare-ground-change output as GeoJSON.
-- **Day 6–7:** Stand up the Next.js shell with a map component rendering dummy data, so there's always something visually working to show.
+**In scope (original MVP):** one river basin, before/after comparison over a pretrained model (no training required), a map dashboard, a simple explainable weighted risk score, seeded community reports as a fallback.
 
-### Week 2 — Integration & prediction layer
-- **Day 8–10:** Wire real detection output into Supabase and onto the map; get the before/after imagery toggle working — the key visual moment for judges.
-- **Day 11–12:** Build the community report flow end-to-end; seed 10–15 realistic sample reports as a safety net against live SMS unreliability.
-- **Day 13–14:** Build the risk-scoring heuristic and render it as a heatmap layer.
+**Out of scope (by design):** national coverage, a trained/fine-tuned CV model, fully production-hardened SMS at scale, real-time continuous monitoring.
 
-### Week 3 — Polish, resilience, pitch
-- **Day 15–17:** Handle edge cases (cloud cover gaps, empty states); tighten UI; cache a known-good dataset so the demo doesn't depend on live internet/API calls during judging.
-- **Day 18–19:** Full run-through; fix what breaks; finalize the pitch deck around the before/after reveal as the hook.
-- **Day 20–21:** Buffer — something in a geospatial pipeline will break close to the deadline, budget time for it.
+**Team roles:** Person A owned the Earth Engine pipeline; Person B owned the frontend/map; Person C owned the SMS flow, the risk heuristic, and the pitch.
 
-## User Flow Scenarios
+**Risks identified going in:** Earth Engine approval delay, cloud cover blocking clean imagery, live SMS failing on stage, team unfamiliarity with geospatial Python, running out of time for the predictive layer — mitigated respectively by registering day 1, picking basins/dates with 2 backups, treating live SMS as a bonus not a dependency, front-loading the hardest task, and keeping the risk model deliberately simple.
 
-**Scenario 1 — EPA / civil society officer (primary user).** Ama, who works for an environmental watchdog, opens the dashboard and sees the river basin map. Confirmed sites appear as red markers; clicking one shows a before/after satellite comparison — forest three months ago, bare soil now. A heatmap overlay shows a predicted risk zone extending downstream from an existing site, since mining is known to spread along tributaries. She exports the highest-risk zones as a brief for a district task force.
+**Original stretch goals:** replace the heuristic with a trained Random Forest once enough labels accumulate, expand to multiple basins nationally, live production-grade SMS with verified partnerships, automated recurring imagery pulls.
 
-**Scenario 2 — Community member (data contributor).** Kwabena, who lives near the river, notices new equipment moving into a forested area upstream. He sends a short SMS via the Africa's Talking short code. This creates a pending (yellow) marker on the map, which upgrades to confirmed (red) once satellite data corroborates it or a second independent report matches. No smartphone or data plan required — this is the flywheel in action: everyday residents become the sensor network.
-
-**Scenario 3 — Judge / demo walkthrough** *(build backwards from this)*. The dashboard opens pre-loaded with seeded data. "Three months ago, this stretch of the river was forest." Click the before/after toggle — forest becomes bare soil, visually obvious with zero domain knowledge needed. Point to a community report pin nearby: "a resident flagged the same spot independently." Switch to the risk heatmap: "based on how galamsey spreads along tributaries, here's where we predict the next site within 60 days — the difference between reacting to a ruined river and getting there first." Total demo time: under 90 seconds, no machine-learning jargon required.
-
-## Risks & Mitigations
-
-| Risk | Mitigation |
-|---|---|
-| Earth Engine approval delay | Register on day 1, not later; have a teammate with an existing Google Cloud account try registering in parallel |
-| Cloud cover blocks clean before/after imagery for the chosen dates/region | Pick the basin and date range early based on a quick manual check of image availability; have 2 backup basins in mind |
-| Live SMS demo fails on stage | Rely on seeded sample reports for the main demo; treat live SMS as a bonus, not a dependency |
-| Team unfamiliar with Earth Engine/Python geospatial work | Front-load this task in week 1; both other teammates build against mock data so nobody blocks on it |
-| Running out of time for the predictive layer | The weighted heuristic is deliberately simple by design — it's a fallback-proof scope, not a stretch goal |
-
-## Post-Hackathon Stretch Goals
-
-*(Mention briefly in the pitch — don't build now.)*
-
-- Replace the weighted heuristic with a trained Random Forest model once enough confirmed-site labels accumulate.
-- Expand to multiple river basins nationally.
-- Live, production-grade SMS/USSD pipeline with verified partnerships (EPA Ghana, Forestry Commission).
-- Automated recurring imagery pulls instead of manual before/after snapshots.
+</details>
 
 ---
 
