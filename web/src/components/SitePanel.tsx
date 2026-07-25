@@ -24,10 +24,16 @@ export default function SitePanel({
   const hasImagery = Boolean(site.beforeImageUrl && site.afterImageUrl);
 
   return (
-    <div className="absolute right-4 top-4 z-[1000] w-96 max-w-[calc(100%-2rem)] rounded-xl border border-ink-700 bg-black/95 shadow-2xl backdrop-blur">
+    <div
+      className="fixed inset-x-0 bottom-0 z-[1400] max-h-[80vh] overflow-y-auto rounded-t-xl border border-ink-700 bg-black/95 shadow-2xl backdrop-blur
+        md:absolute md:inset-x-auto md:bottom-auto md:right-4 md:top-4 md:max-h-none md:w-96 md:max-w-[calc(100%-2rem)] md:rounded-xl"
+    >
+      <div className="flex justify-center pb-1 pt-2 md:hidden">
+        <span className="h-1 w-10 rounded-full bg-ink-700" aria-hidden="true" />
+      </div>
       <div className="flex items-start justify-between border-b border-ink-700 p-4">
-        <div>
-          <h3 className="font-semibold text-gold-300">{site.name}</h3>
+        <div className="min-w-0">
+          <h3 className="truncate font-semibold text-gold-300">{site.name}</h3>
           <p className="mt-0.5 text-xs text-neutral-400">
             Detected {new Date(site.detectedAt).toLocaleDateString()} ·{" "}
             {site.areaHa != null ? `${site.areaHa} ha · ` : ""}
@@ -37,7 +43,7 @@ export default function SitePanel({
         <button
           onClick={onClose}
           aria-label="Close site panel"
-          className="rounded-md p-1.5 text-neutral-400 hover:bg-ink-800 hover:text-white"
+          className="shrink-0 rounded-md p-2 text-neutral-400 hover:bg-ink-800 hover:text-white"
         >
           <IconClose className="h-4 w-4" />
         </button>

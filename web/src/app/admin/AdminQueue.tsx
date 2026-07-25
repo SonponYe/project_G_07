@@ -36,8 +36,8 @@ export default function AdminQueue({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-widest text-gold-600">
             Authority Portal
@@ -74,8 +74,8 @@ export default function AdminQueue({
                 key={site.id}
                 className="rounded-lg border border-ink-700 bg-ink-900 p-4"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
                     <p className="font-medium text-neutral-100">{site.name}</p>
                     <p className="mt-0.5 text-xs text-neutral-400">
                       {site.lat.toFixed(4)}, {site.lng.toFixed(4)} ·{" "}
@@ -95,7 +95,7 @@ export default function AdminQueue({
                       onClick={() =>
                         startTransition(() => setSiteReview(site.id, "published"))
                       }
-                      className="rounded-md bg-gold-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-gold-400 disabled:opacity-50"
+                      className="flex-1 rounded-md bg-gold-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-gold-400 disabled:opacity-50 sm:flex-none"
                     >
                       Publish
                     </button>
@@ -104,7 +104,7 @@ export default function AdminQueue({
                       onClick={() =>
                         startTransition(() => setSiteReview(site.id, "rejected"))
                       }
-                      className="rounded-md border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-950"
+                      className="flex-1 rounded-md border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-950 sm:flex-none"
                     >
                       Reject
                     </button>
@@ -129,8 +129,8 @@ export default function AdminQueue({
                 key={report.id}
                 className="rounded-lg border border-ink-700 bg-ink-900 p-4"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0">
                     <p className="text-sm text-neutral-200">“{report.message}”</p>
                     <p className="mt-0.5 text-xs text-neutral-600">
                       {report.locality ?? "unknown locality"} ·{" "}
@@ -143,7 +143,7 @@ export default function AdminQueue({
                       onClick={() =>
                         startTransition(() => setReportStatus(report.id, "confirmed"))
                       }
-                      className="rounded-md bg-gold-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-gold-400 disabled:opacity-50"
+                      className="flex-1 rounded-md bg-gold-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-gold-400 disabled:opacity-50 sm:flex-none"
                     >
                       Confirm
                     </button>
@@ -152,7 +152,7 @@ export default function AdminQueue({
                       onClick={() =>
                         startTransition(() => setReportStatus(report.id, "rejected"))
                       }
-                      className="rounded-md border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-950"
+                      className="flex-1 rounded-md border border-red-900 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-950 sm:flex-none"
                     >
                       Reject
                     </button>

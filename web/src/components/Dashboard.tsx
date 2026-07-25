@@ -7,6 +7,7 @@ import type { Viewer } from "@/lib/auth";
 import { exportHighRiskGeoJSON, exportSitesGeoJSON } from "@/lib/export";
 import type { ConfirmedSite, DashboardData, LayerVisibility } from "@/lib/types";
 
+import { IconClose, IconMenu } from "./icons";
 import LayerControls from "./LayerControls";
 import Legend from "./Legend";
 import SitePanel from "./SitePanel";
@@ -34,6 +35,7 @@ export default function Dashboard({
     risk: true,
   });
   const [selectedSite, setSelectedSite] = useState<ConfirmedSite | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const isOfficer = viewer?.role === "officer" || viewer?.role === "admin";
 
   const stats = useMemo(
@@ -47,50 +49,104 @@ export default function Dashboard({
 
   return (
     <div className="flex h-screen flex-col bg-ink-950">
-      <header className="flex items-center justify-between border-b border-gold-800/40 bg-black px-5 py-3">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-lg font-semibold tracking-tight text-gold-400">
-            Galamsey <span className="text-neutral-100">Eye</span>
-          </h1>
-          <span className="text-xs text-neutral-500">
-            Pra River Basin · satellite + community monitoring
-          </span>
+      <header className="flex items-center justify-between gap-2 border-b border-gold-800/40 bg-black px-3 py-2.5 sm:px-5 sm:py-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+            className="-ml-1 shrink-0 rounded-md p-2 text-neutral-300 hover:bg-ink-800 hover:text-gold-400 md:hidden"
+          >
+            <IconMenu className="h-5 w-5" />
+          </button>
+          <div className="flex min-w-0 items-baseline gap-2 sm:gap-3">
+            <h1 className="shrink-0 text-base font-semibold tracking-tight text-gold-400 sm:text-lg">
+              Galamsey <span className="text-neutral-100">Eye</span>
+            </h1>
+            <span className="hidden truncate text-xs text-neutral-500 sm:inline">
+              Pra River Basin · satellite + community monitoring
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-4 text-xs">
+
+        <div className="flex shrink-0 items-center gap-2 text-[11px] sm:gap-4 sm:text-xs">
           {initial.demoMode && (
-            <span className="rounded-full border border-gold-700/40 bg-gold-950/40 px-2.5 py-1 font-medium text-gold-400">
-              Demo mode — seeded data
+            <span className="hidden rounded-full border border-gold-700/40 bg-gold-950/40 px-2.5 py-1 font-medium text-gold-400 sm:inline">
+              Demo mode
             </span>
           )}
-          <span className="text-neutral-300">
-            <b className="text-red-400">{stats.confirmed}</b> confirmed sites
+          <span className="hidden text-neutral-300 sm:inline">
+            <b className="text-red-400">{stats.confirmed}</b> confirmed
           </span>
-          <span className="text-neutral-300">
-            <b className="text-gold-400">{stats.pending}</b> pending reports
+          <span className="hidden text-neutral-300 md:inline">
+            <b className="text-gold-400">{stats.pending}</b> pending
           </span>
-          <span className="text-neutral-300">
-            <b className="text-orange-400">{stats.highRisk}</b> high-risk zones
+          <span className="hidden text-neutral-300 md:inline">
+            <b className="text-orange-400">{stats.highRisk}</b> high-risk
           </span>
           {isOfficer ? (
             <a
               href="/admin"
-              className="rounded-md border border-gold-600 bg-gold-500/10 px-2.5 py-1 font-medium text-gold-300 hover:bg-gold-500/20"
+              className="rounded-md border border-gold-600 bg-gold-500/10 px-2 py-1 font-medium text-gold-300 hover:bg-gold-500/20 sm:px-2.5"
             >
-              Moderation queue
+              <span className="sm:hidden">Queue</span>
+              <span className="hidden sm:inline">Moderation queue</span>
             </a>
           ) : (
             <a
               href="/login"
-              className="rounded-md border border-ink-700 px-2.5 py-1 text-neutral-500 hover:border-gold-700 hover:text-gold-400"
+              className="rounded-md border border-ink-700 px-2 py-1 text-neutral-500 hover:border-gold-700 hover:text-gold-400 sm:px-2.5"
             >
-              Officer sign in
+              <span className="sm:hidden">Sign in</span>
+              <span className="hidden sm:inline">Officer sign in</span>
             </a>
           )}
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink-800 bg-ink-950 p-4">
+      {/* Mobile stats row — hidden on sm+ where the header shows them inline */}
+      <div className="flex items-center gap-3 border-b border-ink-800 bg-ink-950 px-3 py-1.5 text-[11px] text-neutral-400 sm:hidden">
+        <span>
+          <b className="text-red-400">{stats.confirmed}</b> confirmed
+        </span>
+        <span>
+          <b className="text-gold-400">{stats.pending}</b> pending
+        </span>
+        <span>
+          <b className="text-orange-400">{stats.highRisk}</b> high-risk
+        </span>
+        {initial.demoMode && (
+          <span className="ml-auto rounded-full border border-gold-700/40 bg-gold-950/40 px-2 py-0.5 font-medium text-gold-400">
+            Demo
+          </span>
+        )}
+      </div>
+
+      <div className="relative flex min-h-0 flex-1">
+        {/* Backdrop — mobile only, closes the drawer on tap-outside */}
+        {sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-[1500] bg-black/70 md:hidden"
+            aria-hidden="true"
+          />
+        )}
+
+        <aside
+          className={`fixed inset-y-0 left-0 z-[1600] flex w-[85vw] max-w-xs shrink-0 -translate-x-full flex-col gap-4 overflow-y-auto border-r border-ink-800 bg-ink-950 p-4 transition-transform duration-200 ease-out md:static md:z-auto md:w-72 md:max-w-none md:translate-x-0 ${
+            sidebarOpen ? "translate-x-0" : ""
+          }`}
+        >
+          <div className="flex items-center justify-between md:hidden">
+            <span className="text-sm font-semibold text-gold-400">Menu</span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close menu"
+              className="rounded-md p-2 text-neutral-400 hover:bg-ink-800 hover:text-white"
+            >
+              <IconClose className="h-4 w-4" />
+            </button>
+          </div>
+
           <LayerControls layers={layers} onChange={setLayers} />
           <Legend />
 
