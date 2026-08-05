@@ -1,27 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 
+import { setSiteReview } from "@/app/admin/actions";
 import type { CommunityReport, ConfirmedSite } from "@/lib/types";
 
 import { IconClose } from "./icons";
 
 /**
  * Site detail panel with the before/after reveal — the key visual moment
- * of the demo. When Earth Engine thumbnails exist they're shown with a
- * wipe slider; otherwise labelled placeholders keep the flow demoable.
+ * of the demo, and also the point where an officer actually verifies a
+ * detection before publishing it. When Earth Engine thumbnails exist
+ * they're shown with a wipe slider; otherwise labelled placeholders keep
+ * the flow demoable.
  */
 export default function SitePanel({
   site,
   reports,
+  isOfficer,
   onClose,
 }: {
   site: ConfirmedSite;
   reports: CommunityReport[];
+  isOfficer: boolean;
   onClose: () => void;
 }) {
   const [wipe, setWipe] = useState(50);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   const hasImagery = Boolean(site.beforeImageUrl && site.afterImageUrl);
+  const needsReview = isOfficer && site.reviewStatus === "pending_review";
+
+  function handleReview(status: "published" | "rejected") {
+    setReviewError(null);
+    startTransition(async () => {
+      try {
+        await setSiteReview(site.id, status);
+        router.refresh();
+        onClose();
+      } catch (err) {
+        setReviewError(err instanceof Error ? err.message : "Failed to update — try again.");
+      }
+    });
+  }
 
   return (
     <div
@@ -33,7 +56,14 @@ export default function SitePanel({
       </div>
       <div className="flex items-start justify-between border-b border-ink-700 p-4">
         <div className="min-w-0">
-          <h3 className="truncate font-semibold text-gold-300">{site.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="truncate font-semibold text-gold-300">{site.name}</h3>
+            {needsReview && (
+              <span className="shrink-0 rounded-full border border-gold-700 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-gold-400">
+                Pending
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-xs text-neutral-400">
             Detected {new Date(site.detectedAt).toLocaleDateString()} ·{" "}
             {site.areaHa != null ? `${site.areaHa} ha · ` : ""}
@@ -48,6 +78,31 @@ export default function SitePanel({
           <IconClose className="h-4 w-4" />
         </button>
       </div>
+
+      {needsReview && (
+        <div className="border-b border-gold-800/50 bg-gold-950/30 p-4">
+          <p className="mb-2 text-xs font-medium text-gold-300">
+            Awaiting your review — verify against the before/after photos below.
+          </p>
+          <div className="flex gap-2">
+            <button
+              disabled={isPending}
+              onClick={() => handleReview("published")}
+              className="flex-1 rounded-md bg-gold-500 px-3 py-2 text-xs font-semibold text-black hover:bg-gold-400 disabled:opacity-50"
+            >
+              {isPending ? "Working…" : "Publish"}
+            </button>
+            <button
+              disabled={isPending}
+              onClick={() => handleReview("rejected")}
+              className="flex-1 rounded-md border border-red-900 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-950 disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
+          {reviewError && <p className="mt-2 text-xs text-red-400">{reviewError}</p>}
+        </div>
+      )}
 
       <div className="p-4">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold-600">

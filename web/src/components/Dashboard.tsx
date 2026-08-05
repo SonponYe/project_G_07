@@ -1,8 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 
+import { setReportStatus, signOutAction } from "@/app/admin/actions";
 import type { Viewer } from "@/lib/auth";
 import { exportHighRiskGeoJSON, exportSitesGeoJSON } from "@/lib/export";
 import type { ConfirmedSite, DashboardData, LayerVisibility } from "@/lib/types";
@@ -36,16 +38,34 @@ export default function Dashboard({
   });
   const [selectedSite, setSelectedSite] = useState<ConfirmedSite | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const pathname = usePathname();
   const isOfficer = viewer?.role === "officer" || viewer?.role === "admin";
+  const onAdmin = pathname === "/admin";
 
   const stats = useMemo(
     () => ({
-      confirmed: initial.sites.length,
-      pending: initial.reports.filter((r) => r.status === "pending").length,
+      confirmed: initial.sites.filter((s) => s.reviewStatus === "published").length,
+      pendingReview: initial.sites.filter((s) => s.reviewStatus === "pending_review"),
+      pending: initial.reports.filter((r) => r.status === "pending"),
       highRisk: initial.riskCells.filter((c) => c.score >= 0.7).length,
     }),
     [initial]
   );
+
+  function handleReportAction(id: string, status: "confirmed" | "rejected") {
+    setReportError(null);
+    startTransition(async () => {
+      try {
+        await setReportStatus(id, status);
+        router.refresh();
+      } catch (err) {
+        setReportError(err instanceof Error ? err.message : "Failed to update — try again.");
+      }
+    });
+  }
 
   return (
     <div className="flex h-screen flex-col bg-ink-950">
@@ -63,7 +83,9 @@ export default function Dashboard({
               Galamsey <span className="text-neutral-100">Eye</span>
             </h1>
             <span className="hidden truncate text-xs text-neutral-500 sm:inline">
-              Pra River Basin · satellite + community monitoring
+              {onAdmin
+                ? "Authority Portal · Pra River Basin"
+                : "Pra River Basin · satellite + community monitoring"}
             </span>
           </div>
         </div>
@@ -78,19 +100,33 @@ export default function Dashboard({
             <b className="text-red-400">{stats.confirmed}</b> confirmed
           </span>
           <span className="hidden text-neutral-300 md:inline">
-            <b className="text-gold-400">{stats.pending}</b> pending
+            <b className="text-gold-400">{stats.pending.length}</b> pending
           </span>
           <span className="hidden text-neutral-300 md:inline">
             <b className="text-orange-400">{stats.highRisk}</b> high-risk
           </span>
+          {isOfficer && stats.pendingReview.length > 0 && (
+            <span className="rounded-full border border-gold-600 bg-gold-500/10 px-2 py-0.5 font-medium text-gold-300">
+              {stats.pendingReview.length} to review
+            </span>
+          )}
           {isOfficer ? (
-            <a
-              href="/admin"
-              className="rounded-md border border-gold-600 bg-gold-500/10 px-2 py-1 font-medium text-gold-300 hover:bg-gold-500/20 sm:px-2.5"
-            >
-              <span className="sm:hidden">Queue</span>
-              <span className="hidden sm:inline">Moderation queue</span>
-            </a>
+            <>
+              <a
+                href={onAdmin ? "/" : "/admin"}
+                className="rounded-md border border-gold-600 bg-gold-500/10 px-2 py-1 font-medium text-gold-300 hover:bg-gold-500/20 sm:px-2.5"
+              >
+                <span className="sm:hidden">{onAdmin ? "Public" : "Queue"}</span>
+                <span className="hidden sm:inline">
+                  {onAdmin ? "Public dashboard" : "Moderation queue"}
+                </span>
+              </a>
+              <form action={signOutAction}>
+                <button className="rounded-md border border-ink-700 px-2 py-1 text-neutral-500 hover:border-red-800 hover:text-red-300 sm:px-2.5">
+                  Sign out
+                </button>
+              </form>
+            </>
           ) : (
             <a
               href="/login"
@@ -109,7 +145,7 @@ export default function Dashboard({
           <b className="text-red-400">{stats.confirmed}</b> confirmed
         </span>
         <span>
-          <b className="text-gold-400">{stats.pending}</b> pending
+          <b className="text-gold-400">{stats.pending.length}</b> pending
         </span>
         <span>
           <b className="text-orange-400">{stats.highRisk}</b> high-risk
@@ -147,8 +183,79 @@ export default function Dashboard({
             </button>
           </div>
 
+          {isOfficer && (
+            <section className="rounded-lg border border-gold-700/50 bg-gold-950/20 p-3">
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold-500">
+                Pending review ({stats.pendingReview.length + stats.pending.length})
+              </h2>
+
+              {stats.pendingReview.length === 0 && stats.pending.length === 0 ? (
+                <p className="text-xs text-neutral-500">Queue is clear.</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {stats.pendingReview.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-[11px] font-medium text-neutral-400">
+                        Detections ({stats.pendingReview.length})
+                      </p>
+                      {stats.pendingReview.map((site) => (
+                        <button
+                          key={site.id}
+                          onClick={() => {
+                            setSelectedSite(site);
+                            setSidebarOpen(false);
+                          }}
+                          className="rounded-md border border-ink-700 bg-ink-900 px-2.5 py-1.5 text-left text-xs text-gold-200 hover:border-gold-700"
+                        >
+                          {site.name}
+                          {site.areaHa != null ? ` · ${site.areaHa} ha` : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {stats.pending.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-[11px] font-medium text-neutral-400">
+                        Community reports ({stats.pending.length})
+                      </p>
+                      {stats.pending.map((report) => (
+                        <div
+                          key={report.id}
+                          className="rounded-md border border-ink-700 bg-ink-900 p-2"
+                        >
+                          <p className="text-xs text-neutral-300">“{report.message}”</p>
+                          <p className="mt-0.5 text-[10px] text-neutral-600">
+                            {report.locality ?? "unknown locality"}
+                          </p>
+                          <div className="mt-1.5 flex gap-1.5">
+                            <button
+                              disabled={isPending}
+                              onClick={() => handleReportAction(report.id, "confirmed")}
+                              className="flex-1 rounded bg-gold-500 px-2 py-1 text-[10px] font-semibold text-black hover:bg-gold-400 disabled:opacity-50"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              disabled={isPending}
+                              onClick={() => handleReportAction(report.id, "rejected")}
+                              className="flex-1 rounded border border-red-900 px-2 py-1 text-[10px] text-red-300 hover:bg-red-950 disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {reportError && <p className="text-xs text-red-400">{reportError}</p>}
+                </div>
+              )}
+            </section>
+          )}
+
           <LayerControls layers={layers} onChange={setLayers} />
-          <Legend />
+          <Legend isOfficer={isOfficer} />
 
           <div className="rounded-lg border border-ink-700 bg-ink-900 p-3 text-xs leading-relaxed text-neutral-400">
             <p className="mb-1 font-medium text-gold-400">Report a site by SMS</p>
@@ -199,6 +306,7 @@ export default function Dashboard({
               reports={initial.reports.filter(
                 (r) => r.matchedSiteId === selectedSite.id
               )}
+              isOfficer={isOfficer}
               onClose={() => setSelectedSite(null)}
             />
           )}

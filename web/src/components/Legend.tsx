@@ -1,4 +1,4 @@
-export default function Legend() {
+export default function Legend({ isOfficer = false }: { isOfficer?: boolean }) {
   return (
     <section className="rounded-lg border border-ink-700 bg-ink-900 p-3">
       <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gold-600">
@@ -9,6 +9,12 @@ export default function Legend() {
           <span className="inline-block h-3 w-3 rounded-full border-2 border-red-900 bg-red-600" />
           Confirmed mining site
         </li>
+        {isOfficer && (
+          <li className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-full border-2 border-dashed border-gold-700 bg-gold-400/60" />
+            Awaiting your review (only visible to officers)
+          </li>
+        )}
         <li className="flex items-center gap-2">
           <span className="inline-block h-3 w-3 rounded-full bg-gold-400" />
           Pending community report

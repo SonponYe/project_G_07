@@ -1,12 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { SAMPLE_REPORTS, SAMPLE_RISK, SAMPLE_SITES } from "./sample-data";
+import { createClient as createAuthedClient } from "./supabase/server";
 import type {
   CommunityReport,
   ConfirmedSite,
   DashboardData,
   RiskCell,
 } from "./types";
+
+const SITE_COLUMNS =
+  "id,name,lat,lng,area_ha,detected_at,detection_source,ndwi_drop,water_corroborated,review_status,officer_notes,before_image_url,after_image_url,basin";
+const REPORT_COLUMNS = "id,message,locality,lat,lng,status,matched_site_id,created_at";
+const RISK_COLUMNS = "id,cell_id,lat,lng,cell_deg,score,factors,window_days,computed_at";
 
 /**
  * Server-side data access for the dashboard. Reads use the ANON key only —
@@ -31,24 +37,20 @@ export async function getDashboardData(): Promise<DashboardData> {
     const [sitesRes, reportsRes, riskRes] = await Promise.all([
       supabase
         .from("confirmed_sites")
-        .select(
-          "id,name,lat,lng,area_ha,detected_at,detection_source,ndwi_drop,water_corroborated,review_status,officer_notes,before_image_url,after_image_url,basin"
-        )
+        .select(SITE_COLUMNS)
         // RLS already restricts anon reads to review_status='published',
         // but scope explicitly so intent is clear from the query alone.
         .eq("review_status", "published")
         .order("detected_at", { ascending: false }),
       supabase
         .from("community_reports")
-        .select("id,message,locality,lat,lng,status,matched_site_id,created_at")
+        .select(REPORT_COLUMNS)
         .neq("status", "rejected")
         .order("created_at", { ascending: false })
         .limit(200),
       supabase
         .from("risk_scores")
-        .select(
-          "id,cell_id,lat,lng,cell_deg,score,factors,window_days,computed_at"
-        )
+        .select(RISK_COLUMNS)
         .order("score", { ascending: false })
         .limit(2000),
     ]);
@@ -65,6 +67,44 @@ export async function getDashboardData(): Promise<DashboardData> {
     };
   } catch {
     return demoData();
+  }
+}
+
+/**
+ * Officer-scoped reads — uses the signed-in user's own authenticated
+ * session (cookie-based), not the anon key. RLS's `officers read all
+ * sites` policy then also returns `pending_review`/`rejected` sites, which
+ * anon reads never see. Falls back to the public dataset (not demo data)
+ * on any failure, since a signed-in officer should still see real data
+ * even if this richer read fails for some reason.
+ */
+export async function getOfficerDashboardData(): Promise<DashboardData> {
+  try {
+    const supabase = await createAuthedClient();
+
+    const [sitesRes, reportsRes, riskRes] = await Promise.all([
+      supabase.from("confirmed_sites").select(SITE_COLUMNS).order("detected_at", { ascending: false }),
+      supabase
+        .from("community_reports")
+        .select(REPORT_COLUMNS)
+        .neq("status", "rejected")
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase.from("risk_scores").select(RISK_COLUMNS).order("score", { ascending: false }).limit(2000),
+    ]);
+
+    if (sitesRes.error || reportsRes.error || riskRes.error) {
+      return getDashboardData();
+    }
+
+    return {
+      demoMode: false,
+      sites: (sitesRes.data ?? []).map(mapSite),
+      reports: (reportsRes.data ?? []).map(mapReport),
+      riskCells: (riskRes.data ?? []).map(mapRisk),
+    };
+  } catch {
+    return getDashboardData();
   }
 }
 

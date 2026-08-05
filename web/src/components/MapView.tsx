@@ -153,14 +153,16 @@ export default function MapView({
     if (layers.sites) {
       for (const site of sites) {
         const selected = site.id === selectedSiteId;
+        const pending = site.reviewStatus === "pending_review";
         L.circleMarker([site.lat, site.lng], {
           radius: selected ? 12 : 9,
-          color: "#7f1d1d",
-          fillColor: "#dc2626",
-          fillOpacity: 0.95,
+          color: pending ? "#8a6d21" : "#7f1d1d",
+          fillColor: pending ? "#e5c158" : "#dc2626",
+          fillOpacity: pending ? 0.6 : 0.95,
           weight: selected ? 3 : 2,
+          dashArray: pending ? "3,2" : undefined,
         })
-          .bindTooltip(site.name)
+          .bindTooltip(pending ? `${site.name} — pending review` : site.name)
           .on("click", () => onSelectSite(site))
           .addTo(groups.sites);
       }
