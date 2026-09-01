@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { IconChevronLeft } from "@/components/icons";
+import { IconChevronLeft, IconMark } from "@/components/icons";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -45,19 +45,22 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-ink-950">
-      <div className="h-1 w-full bg-gradient-to-r from-gold-700 via-gold-400 to-gold-700" />
-      <div className="flex flex-1 items-center justify-center px-4">
-        <div className="w-full max-w-sm rounded-xl border border-ink-700 bg-black p-6">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-gold-600">
-            Authority Portal
-          </p>
-          <h1 className="mb-1 text-lg font-semibold text-gold-300">
-            Galamsey Eye — Officer sign-in
-          </h1>
-          <p className="mb-5 text-xs text-neutral-500">
-            EPA, Forestry Commission, and task force accounts only.
-          </p>
+    <div className="bg-geo-pattern flex min-h-screen flex-col">
+      <div className="h-1 w-full shrink-0 bg-gradient-to-r from-gold-700 via-gold-400 to-gold-700" />
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm rounded-xl border border-ink-700 bg-black/90 p-6 shadow-2xl backdrop-blur sm:p-7">
+          <div className="mb-5 flex flex-col items-center text-center">
+            <IconMark className="mb-3 h-12 w-12 text-gold-500" />
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gold-600">
+              Authority Portal
+            </p>
+            <h1 className="mt-1 text-lg font-semibold text-gold-300">
+              Galamsey Eye — Officer sign-in
+            </h1>
+            <p className="mt-1 text-xs text-neutral-500">
+              EPA, Forestry Commission, and task force accounts only.
+            </p>
+          </div>
 
           {!configured ? (
             <p className="rounded-md border border-gold-700/40 bg-gold-950/30 p-3 text-xs text-gold-300">

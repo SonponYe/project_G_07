@@ -40,3 +40,15 @@ body {
   height: 100%;
   background: var(--color-ink-950);
 }
+
+/* Faint coordinate-grid texture for auth/gate screens — ties the "eye on a
+   grid" mark into the full page instead of a flat black backdrop, without
+   competing with foreground content. Pure CSS, no image asset. */
+.bg-geo-pattern {
+  background-color: var(--color-ink-950);
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.08), transparent 60%),
+    linear-gradient(rgba(212, 175, 55, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(212, 175, 55, 0.05) 1px, transparent 1px);
+  background-size: auto, 48px 48px, 48px 48px;
+}

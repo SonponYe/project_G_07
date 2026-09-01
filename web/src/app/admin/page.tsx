@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import Dashboard from "@/components/Dashboard";
+import GateMessage from "@/components/GateMessage";
 import { getViewer, isOfficer } from "@/lib/auth";
 import { getOfficerDashboardData } from "@/lib/data";
 import { supabaseConfigured } from "@/lib/supabase/server";
@@ -15,9 +16,11 @@ import { supabaseConfigured } from "@/lib/supabase/server";
 export default async function AdminPage() {
   if (!supabaseConfigured()) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-ink-950 px-4 text-center text-sm text-neutral-400">
-        Moderation requires a configured Supabase project.
-      </div>
+      <GateMessage
+        title="Not configured"
+        message="Moderation requires a configured Supabase project on this deployment."
+        action={{ href: "/", label: "Back to public dashboard" }}
+      />
     );
   }
 
@@ -27,10 +30,11 @@ export default async function AdminPage() {
   }
   if (!isOfficer(viewer)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-ink-950 px-4 text-center text-sm text-neutral-400">
-        Signed in as {viewer.email}, but this account isn&apos;t an officer.
-        Contact an administrator to request access.
-      </div>
+      <GateMessage
+        title="Access restricted"
+        message={`Signed in as ${viewer.email}, but this account isn't an officer. Contact an administrator to request access.`}
+        action={{ href: "/", label: "Back to public dashboard" }}
+      />
     );
   }
 

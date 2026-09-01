@@ -52,6 +52,25 @@ export function IconMenu({ className }: IconProps) {
   );
 }
 
+/** The app mark — a targeting reticle, matching the PWA icon/favicon. Used
+ * wherever a page needs a visual anchor beyond the wordmark (login,
+ * gate/error states). */
+export function IconMark({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 40 40" fill="none" className={className} aria-hidden="true">
+      <circle cx="20" cy="20" r="15.5" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="20" cy="20" r="8.5" stroke="currentColor" strokeWidth="1" />
+      <path
+        d="M20 2.5v4M20 33.5v4M2.5 20h4M33.5 20h4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <circle cx="20" cy="20" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function IconChevronLeft({ className }: IconProps) {
   return (
     <svg
