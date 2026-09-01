@@ -1,4 +1,4 @@
-# Galamsey Eye — Project Breakdown
+# G07 — Project Breakdown
 
 A file-by-file explanation of the repository. For the problem, architecture, and current live status, see [README.md](README.md).
 

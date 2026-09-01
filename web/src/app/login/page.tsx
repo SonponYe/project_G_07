@@ -55,7 +55,7 @@ export default function LoginPage() {
               Authority Portal
             </p>
             <h1 className="mt-1 text-lg font-semibold text-gold-300">
-              Galamsey Eye — Officer sign-in
+              G07 — Officer sign-in
             </h1>
             <p className="mt-1 text-xs text-neutral-500">
               EPA, Forestry Commission, and task force accounts only.

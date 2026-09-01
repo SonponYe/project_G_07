@@ -12,6 +12,7 @@ import type { ConfirmedSite, DashboardData, LayerVisibility } from "@/lib/types"
 import { IconClose, IconMark, IconMenu } from "./icons";
 import LayerControls from "./LayerControls";
 import Legend from "./Legend";
+import Onboarding from "./Onboarding";
 import SitePanel from "./SitePanel";
 
 // Leaflet touches `window` at import time — client-only, no SSR.
@@ -78,6 +79,7 @@ export default function Dashboard({
 
   return (
     <div className="flex h-screen flex-col bg-ink-950">
+      {!onAdmin && <Onboarding />}
       {onAdmin && (
         <div className="h-1 w-full shrink-0 bg-gradient-to-r from-gold-700 via-gold-400 to-gold-700" />
       )}
@@ -94,7 +96,7 @@ export default function Dashboard({
           <IconMark className="hidden h-6 w-6 shrink-0 text-gold-500 sm:block" />
           <div className="flex min-w-0 items-baseline gap-2 sm:gap-3">
             <h1 className="shrink-0 text-base font-semibold tracking-tight text-gold-400 sm:text-lg">
-              Galamsey <span className="text-neutral-100">Eye</span>
+              G07
             </h1>
             <span className="hidden truncate text-xs text-neutral-500 sm:inline">
               {onAdmin

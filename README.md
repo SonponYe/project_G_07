@@ -1,6 +1,6 @@
-# Galamsey Eye
+# G07
 
-**Satellite + community detection and prediction of illegal mining**
+**Pronounced "Geo-7" — satellite + community detection and prediction of illegal mining**
 
 Originally built for the Pan-African AI Summit Hackathon 2026 (ClimateTech Track); since extended into a working system with real satellite detections, an officer moderation workflow, and a mobile-first PWA dashboard.
 

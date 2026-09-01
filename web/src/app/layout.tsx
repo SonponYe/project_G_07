@@ -5,9 +5,9 @@ import InstallPrompt from "@/components/InstallPrompt";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Galamsey Eye — Illegal Mining Detection & Prediction",
+  title: "G07 — Illegal Mining Detection & Prediction",
   description:
-    "Satellite + community detection and prediction of illegal mining (galamsey) in Ghana's river basins.",
+    "G07 (pronounced \"Geo-7\") — satellite + community detection and prediction of illegal mining (galamsey) in Ghana's river basins.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Galamsey Eye",
+    title: "G07",
   },
 };
 

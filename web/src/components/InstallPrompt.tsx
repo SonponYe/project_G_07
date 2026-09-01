@@ -70,7 +70,7 @@ export default function InstallPrompt() {
     <div className="fixed inset-x-0 bottom-0 z-[2000] flex justify-center px-4 pb-4 sm:justify-end sm:pr-4">
       <div className="flex w-full max-w-sm items-start gap-3 rounded-xl border border-[#3a2f12] bg-black/95 p-4 shadow-2xl backdrop-blur">
         <div className="flex-1">
-          <p className="text-sm font-semibold text-[#e5c158]">Install Galamsey Eye</p>
+          <p className="text-sm font-semibold text-[#e5c158]">Install G07</p>
           {showIosHint ? (
             <p className="mt-1 text-xs text-neutral-400">
               Tap the Share icon, then &ldquo;Add to Home Screen&rdquo; to install this
