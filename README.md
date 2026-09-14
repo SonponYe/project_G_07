@@ -49,7 +49,9 @@ Queries Google Earth Engine's **Dynamic World** dataset (`GOOGLE/DYNAMICWORLD/V1
 Independent evidence: mean NDWI (Normalized Difference Water Index) over a 60 m river buffer near each site, before vs. after. A drop past a fixed noise threshold means the water measurably got more turbid — consistent with sediment runoff from mining — and is stored as `water_corroborated`. A missing or *positive* reading (water got clearer, not muddier) is correctly treated as **not** corroborating, never silently upgraded.
 
 ### Layer 3 — Community verification
-Residents text `GALAM <locality> <what they saw>` to an Africa's Talking short code. A report lands as **pending**; it auto-upgrades to **confirmed** when satellite data corroborates it or a second independent sender reports the same spot within ~2 km. Phone numbers are HMAC-hashed before storage — raw numbers are never persisted.
+Residents text `GALAM <locality> <what they saw>` to a phone number relayed through [httpsms](https://httpsms.com) (an Android phone + SIM exposed as an SMS API). A report lands as **pending**; it auto-upgrades to **confirmed** when satellite data corroborates it or a second independent sender reports the same spot within ~2 km. Phone numbers are HMAC-hashed before storage — raw numbers are never persisted.
+
+Note: httpsms relays through a single physical phone, which is a real single point of failure (dead battery, lost signal, app killed) — fine for a pilot, worth revisiting (e.g. Africa's Talking) before this is depended on for real.
 
 ### Layer 4 — Predictive expansion (the differentiator)
 A transparent, explainable weighted score per ~1.1 km grid cell, combining:
@@ -102,7 +104,7 @@ A "Locate me" control requests the browser's location on tap (never automaticall
 | Backend / DB | Supabase (Postgres + Storage) | Tables: `confirmed_sites`, `community_reports`, `risk_scores`, `profiles` |
 | Data pipeline | Python + `earthengine-api`, `shapely`, `supabase-py` | Runs Earth Engine queries, uploads imagery, pushes to Supabase |
 | Satellite data | Google Earth Engine (Dynamic World V1, Sentinel-2) | Free noncommercial tier |
-| Community reports | Africa's Talking SMS/USSD API | Constant-time-verified webhook at `/api/reports` |
+| Community reports | httpsms.com (Android phone as SMS gateway) | Constant-time-verified webhook at `/api/reports` |
 | PWA | Web App Manifest + custom service worker | Installable, offline app shell |
 | Hosting | Vercel (frontend), Supabase (data + auth + storage) | Source mirrored on GitHub and GitLab |
 
@@ -142,7 +144,9 @@ The web app deploys to Vercel; Supabase hosts everything else and needs no separ
 1. Push to your Git remote (GitHub and/or GitLab).
 2. In Vercel: New Project → import the repo → set **Root Directory to `web`** (the app isn't at the repo root).
 3. Add environment variables from `web/.env.local`: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `AT_WEBHOOK_SECRET`, `REPORT_HASH_KEY`.
-4. Deploy. Point Africa's Talking's SMS callback URL at `https://<your-domain>/api/reports?token=<AT_WEBHOOK_SECRET>`.
+4. Deploy. Point httpsms's webhook (Message Received event) at `https://<your-domain>/api/reports?token=<AT_WEBHOOK_SECRET>`.
+
+   (`AT_WEBHOOK_SECRET`'s name is a holdover from an earlier Africa's Talking integration — it's just the generic SMS-webhook shared secret now, kept as-is so no redeploy config change was needed.)
 
 ## Data Sources & APIs
 
@@ -150,7 +154,7 @@ The web app deploys to Vercel; Supabase hosts everything else and needs no separ
 |---|---|---|
 | Dynamic World V1 (Earth Engine) | 10 m land-cover classification (9 classes incl. bare ground, trees, crops) | Free via Earth Engine noncommercial tier |
 | Sentinel-2 (`COPERNICUS/S2_HARMONIZED`) | Raw multispectral imagery for NDWI and before/after photos | Free via Earth Engine |
-| Africa's Talking | SMS/USSD ingestion for community reports | Sandbox for testing, production tier for real deployment |
+| httpsms.com | SMS ingestion via an Android phone + SIM exposed as an API | Free/self-hosted-style — real phone number, no telecom approval needed |
 | Ghana Forestry Commission reserve boundaries | Forest reserve boundaries, for proximity scoring | **Still a placeholder** — public GIS data pending manual sourcing |
 | Gold price historical data | Optional multiplier for the risk model | **Still stubbed at neutral (1.0)** — no live feed wired in yet |
 
@@ -160,6 +164,7 @@ The web app deploys to Vercel; Supabase hosts everything else and needs no separ
 - **Gold-price multiplier** is stubbed neutral; no live market feed connected.
 - **No automated recurring pipeline runs** — every run is manual (`python run_pipeline.py`). Fine for the current cadence (land clearing takes months to show up in a 3-month satellite comparison anyway); a scheduled job (e.g. GitHub Actions cron) would be a small addition later.
 - **Single basin (Pra)** — the config supports two backup basins (Ankobra, Offin) but only Pra has been run for real.
+- **SMS relies on one physical Android phone (httpsms)** — a real single point of failure (dead battery, lost signal, app killed). Fine for a pilot; Africa's Talking (production telecom infrastructure) is the better choice before this is depended on for real. The webhook's httpsms payload parsing also hasn't been exercised against a live message yet — see the comment in `api/reports/route.ts` if the first real report doesn't land.
 
 ## Origin: Hackathon Scope
 

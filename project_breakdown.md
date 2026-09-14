@@ -51,11 +51,10 @@ project_G_07/
         │   ├── login/
         │   │   └── page.tsx      Officer sign-in (no public self-signup)
         │   ├── admin/
-        │   │   ├── page.tsx      Server component: gates on officer role, fetches pending queue
-        │   │   ├── AdminQueue.tsx  Client component: publish/reject buttons, mobile-responsive
+        │   │   ├── page.tsx      Server component: gates on officer role, renders the shared Dashboard with officer-scoped data
         │   │   └── actions.ts    Server actions — run under the signed-in officer's own session
         │   └── api/reports/
-        │       └── route.ts      Africa's Talking SMS webhook (Layer 3)
+        │       └── route.ts      httpsms SMS webhook (Layer 3)
         ├── components/
         │   ├── Dashboard.tsx     Client shell: header, retractable mobile drawer, sidebar, map
         │   ├── MapView.tsx       Leaflet map: sites, reports, risk grid, base layers, geolocation
@@ -139,10 +138,9 @@ Refreshes the Supabase session cookie on every request so Server Components alwa
 | `page.tsx` | Server component. Fetches dashboard data *and* the current viewer's role in parallel, hands both to the client `Dashboard`. |
 | `globals.css` | Tailwind import, black/gold theme tokens defined via Tailwind v4's `@theme`, Leaflet container sizing. |
 | `login/page.tsx` | Officer sign-in form. No public signup — accounts are provisioned manually (Supabase dashboard + a `profiles` row), matching how real institutional access would be granted. |
-| `admin/page.tsx` | Server component. Redirects to `/login` if signed out, shows a plain message if signed in but not an officer, otherwise fetches the pending-review queue. |
-| `admin/AdminQueue.tsx` | Client component rendering the queue with Publish/Reject/Confirm buttons; stacks vertically on mobile instead of cramping next to the text. |
-| `admin/actions.ts` | Server actions for publish/reject/sign-out. Run under the **signed-in user's own session** (not the service role) — the database's `is_officer()` policy is the real enforcement, not the button being hidden in the UI. |
-| `api/reports/route.ts` | **Layer 3** — the Africa's Talking SMS webhook. Parses `GALAM <locality> <message>`, geocodes it, stores a pending report, and auto-upgrades to confirmed on a second independent nearby report. Constant-time secret check, HMAC-hashed phone numbers, Zod validation, per-sender rate limiting, fails closed when unconfigured. |
+| `admin/page.tsx` | Server component. Redirects to `/login` if signed out, shows a `GateMessage` card if signed in but not an officer, otherwise fetches officer-scoped data (including `pending_review` sites) and renders the same `Dashboard` the public sees — with the moderation queue, tabs, and thumbnail previews built into it. |
+| `admin/actions.ts` | Server actions for publish/reject/sign-out. Run under the **signed-in user's own session** (not the service role) — the database's `is_officer()` policy is the real enforcement, not a button being hidden in the UI. |
+| `api/reports/route.ts` | **Layer 3** — the [httpsms](https://httpsms.com) SMS webhook (an Android phone + SIM exposed as an API; previously Africa's Talking). Parses `GALAM <locality> <message>`, geocodes it, stores a pending report, and auto-upgrades to confirmed on a second independent nearby report. Constant-time secret check, HMAC-hashed phone numbers, Zod validation, per-sender rate limiting, fails closed when unconfigured. The httpsms payload shape is parsed defensively (a few plausible field names) and unrecognized payloads are logged rather than dropped silently, since it hasn't been exercised against a live message yet. |
 
 ### `src/components/` — UI
 

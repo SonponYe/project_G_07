@@ -8,11 +8,15 @@ import { geocodeLocality } from "@/lib/localities";
 export const runtime = "nodejs";
 
 /**
- * Africa's Talking incoming-SMS webhook (Layer 2 — community verification).
+ * httpsms.com incoming-SMS webhook (Layer 2 — community verification).
+ * httpsms turns an Android phone + SIM into an SMS gateway and posts a
+ * JSON event to this URL for every message it receives — a real phone
+ * number, not a telecom short code, so anyone can text it directly.
  *
  * Security measures:
  *  1. Shared-secret token in the callback URL, compared in constant time —
- *     Africa's Talking doesn't sign payloads, so the URL is the credential.
+ *     the URL itself is the credential (works regardless of whatever
+ *     signing scheme, if any, httpsms adds on their end).
  *  2. Phone numbers are HMAC-hashed before storage; raw numbers never
  *     touch the database.
  *  3. Zod validation + message length cap before anything is persisted.
@@ -21,18 +25,19 @@ export const runtime = "nodejs";
  *  5. Writes use the service-role key server-side only; RLS blocks all
  *     client-side writes.
  *
- * Expected SMS format: "GALAM <locality> <what you saw>"
- * Corroboration rule: a second independent report (different sender)
- * within ~2 km upgrades both to "confirmed".
+ * Expected SMS format (unchanged, provider-agnostic): "GALAM <locality>
+ * <what you saw>". Corroboration rule: a second independent report
+ * (different sender) within ~2 km upgrades both to "confirmed".
+ *
+ * Payload shape: httpsms wraps events as `{ event, data: { from/contact,
+ * content/text, to/owner, ... } }`. This has been implemented from their
+ * public docs but not yet exercised against a live payload — if the first
+ * real message doesn't produce a report, check the Vercel function logs:
+ * unrecognized payloads are logged in full (never silently dropped) so the
+ * exact field names can be confirmed and adjusted in one place below.
  */
 
-const IncomingSms = z.object({
-  from: z.string().min(6).max(20),
-  text: z.string().min(1).max(500),
-  to: z.string().optional(),
-  id: z.string().optional(),
-  date: z.string().optional(),
-});
+const RawEvent = z.object({}).passthrough();
 
 const RATE_LIMIT = 5; // reports per sender per hour
 const RATE_WINDOW_MS = 60 * 60 * 1000;
@@ -60,6 +65,25 @@ function isRateLimited(phoneHash: string): boolean {
   return false;
 }
 
+/** Pull { from, text } out of httpsms's event envelope, tolerating a few
+ * plausible field-name variants since this hasn't been verified against a
+ * live payload yet. Returns null if nothing recognizable is found. */
+function extractMessage(body: Record<string, unknown>): { from: string; text: string } | null {
+  const data =
+    body.data && typeof body.data === "object"
+      ? (body.data as Record<string, unknown>)
+      : body;
+
+  const from = data.from ?? data.contact ?? data.sender;
+  const text = data.content ?? data.text ?? data.message ?? data.body;
+
+  if (typeof from !== "string" || typeof text !== "string") return null;
+  if (from.length < 6 || from.length > 20) return null;
+  if (text.length < 1 || text.length > 500) return null;
+
+  return { from, text };
+}
+
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.AT_WEBHOOK_SECRET;
   const hashKey = process.env.REPORT_HASH_KEY;
@@ -76,31 +100,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  // Africa's Talking posts application/x-www-form-urlencoded.
-  let parsed: z.infer<typeof IncomingSms>;
+  let rawBody: Record<string, unknown>;
   try {
-    const form = await request.formData();
-    parsed = IncomingSms.parse(Object.fromEntries(form.entries()));
+    rawBody = RawEvent.parse(await request.json());
   } catch {
-    return NextResponse.json({ error: "invalid payload" }, { status: 400 });
+    console.error("[reports webhook] non-JSON or unparseable body");
+    return NextResponse.json({ status: "ignored" });
   }
 
-  const phoneHash = hashPhone(parsed.from, hashKey);
+  const extracted = extractMessage(rawBody);
+  if (!extracted) {
+    // Don't 400 — an unrecognized shape shouldn't make httpsms retry or
+    // disable the webhook. Log it so the real field names can be read
+    // straight out of the Vercel logs and fixed in extractMessage above.
+    console.error("[reports webhook] unrecognized payload shape:", JSON.stringify(rawBody));
+    return NextResponse.json({ status: "ignored" });
+  }
+
+  const phoneHash = hashPhone(extracted.from, hashKey);
   if (isRateLimited(phoneHash)) {
     return NextResponse.json({ error: "rate limited" }, { status: 429 });
   }
 
   // Parse "GALAM <locality> <message>" — keyword is forgiving of case.
-  const match = parsed.text.match(/^\s*galam\b\s*(.*)$/is);
+  const match = extracted.text.match(/^\s*galam\b\s*(.*)$/is);
   if (!match) {
-    // Not a report — acknowledge so AT doesn't retry, but store nothing.
+    // Not a report — acknowledge so httpsms doesn't retry, but store nothing.
     return NextResponse.json({ status: "ignored" });
   }
-  const body = match[1].trim();
-  const geo = geocodeLocality(body);
+  const messageBody = match[1].trim();
+  const geo = geocodeLocality(messageBody);
   const message = geo
-    ? body.slice(geo.locality.length).trim() || body
-    : body;
+    ? messageBody.slice(geo.locality.length).trim() || messageBody
+    : messageBody;
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
