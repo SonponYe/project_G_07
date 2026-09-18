@@ -34,7 +34,11 @@ interface MapViewProps {
   pickedRadiusM?: number;
 }
 
-const PRA_CENTER: L.LatLngExpression = [5.55, -1.55];
+// Initial viewport only — not tied to any one basin. Centered on the Pra
+// today since it's the only basin with real data so far; harmless to
+// leave pointed there even once other basins are populated, since the
+// map still fits/pans to whatever data actually loads.
+const DEFAULT_MAP_CENTER: L.LatLngExpression = [5.55, -1.55];
 
 function riskColor(score: number): string {
   if (score >= 0.8) return "#dc2626"; // red-600 — imminent
@@ -72,7 +76,7 @@ export default function MapView({
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center: PRA_CENTER,
+      center: DEFAULT_MAP_CENTER,
       zoom: 9,
       zoomControl: true,
     });

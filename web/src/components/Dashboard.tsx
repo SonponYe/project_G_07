@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { requestPipelineRun, setReportStatus, signOutAction } from "@/app/admin/actions";
 import type { Viewer } from "@/lib/auth";
+import { BASINS } from "@/lib/basins";
 import { exportHighRiskGeoJSON, exportSitesGeoJSON } from "@/lib/export";
 import type {
   ConfirmedSite,
@@ -70,6 +71,7 @@ export default function Dashboard({
   const [centerLat, setCenterLat] = useState("");
   const [centerLng, setCenterLng] = useState("");
   const [radiusM, setRadiusM] = useState("2000");
+  const [scanBasin, setScanBasin] = useState<string>(BASINS[0].key);
   const [scanLabel, setScanLabel] = useState("");
   const [scanNotes, setScanNotes] = useState("");
   const [scanReportId, setScanReportId] = useState<string | null>(null);
@@ -144,7 +146,7 @@ export default function Dashboard({
         centerLat: lat,
         centerLng: lng,
         radiusM: radius,
-        basin: "pra",
+        basin: scanBasin,
         label: scanLabel,
         notes: scanNotes,
         reportId: scanReportId,
@@ -191,8 +193,8 @@ export default function Dashboard({
             </h1>
             <span className="hidden truncate text-xs text-neutral-500 sm:inline">
               {onAdmin
-                ? "Authority Portal · Pra River Basin"
-                : "Pra River Basin · satellite + community monitoring"}
+                ? "Authority Portal · Ghana's river basins"
+                : "Ghana's river basins · satellite + community monitoring"}
             </span>
           </div>
         </div>
@@ -501,6 +503,24 @@ export default function Dashboard({
                           </select>
                         </label>
                       )}
+
+                      <label className="flex flex-col gap-1 text-[11px] text-neutral-400">
+                        Basin
+                        <select
+                          value={scanBasin}
+                          onChange={(e) => setScanBasin(e.target.value)}
+                          className="rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:border-gold-500"
+                        >
+                          {BASINS.map((b) => (
+                            <option key={b.key} value={b.key}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-[10px] text-neutral-600">
+                          Picks which basin&apos;s river/reserve data scores the scan — only Pra has real reference data run so far.
+                        </span>
+                      </label>
 
                       <label className="flex flex-col gap-1 text-[11px] text-neutral-400">
                         Radius (metres, 100–20,000)
