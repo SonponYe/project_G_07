@@ -113,6 +113,20 @@ export default function Dashboard({
     setPickMode(false);
   }
 
+  /** Most map apps (Google Maps included) give you one copyable string like
+   * "5.6410, -1.5490" rather than two separate numbers — accept that
+   * directly instead of forcing a split into two fields by hand. */
+  function handlePasteCoords(value: string) {
+    const match = value.match(/(-?\d+\.?\d*)\s*[,\s]\s*(-?\d+\.?\d*)/);
+    if (!match) return;
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+    setCenterLat(lat.toFixed(5));
+    setCenterLng(lng.toFixed(5));
+  }
+
   function handleSelectReport(reportId: string) {
     setScanReportId(reportId || null);
     if (!reportId) return;
@@ -461,6 +475,12 @@ export default function Dashboard({
                         >
                           {pickMode ? "Click the map…" : "Pick on map"}
                         </button>
+                        <input
+                          type="text"
+                          placeholder="Or paste coordinates, e.g. 5.6410, -1.5490"
+                          onChange={(e) => handlePasteCoords(e.target.value)}
+                          className="mt-2 w-full rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-neutral-100 outline-none placeholder:text-neutral-600 focus:border-gold-500"
+                        />
                         <div className="mt-2 grid grid-cols-2 gap-2">
                           <input
                             type="number"
