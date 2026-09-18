@@ -21,6 +21,17 @@ interface MapViewProps {
   layers: LayerVisibility;
   selectedSiteId: string | null;
   onSelectSite: (site: ConfirmedSite) => void;
+  /** Officer "Scan" tab: when true, clicking the map reports the clicked
+   * point instead of the usual marker interactions — used to set a
+   * targeted-run's center without typing raw coordinates. */
+  pickMode?: boolean;
+  onPickPoint?: (lat: number, lng: number) => void;
+  /** Marks the currently-picked scan center, if any, so there's visual
+   * confirmation of what was clicked. */
+  pickedPoint?: { lat: number; lng: number } | null;
+  /** Draws the actual scan radius around pickedPoint, so the officer sees
+   * the real search area, not just a dot. */
+  pickedRadiusM?: number;
 }
 
 const PRA_CENTER: L.LatLngExpression = [5.55, -1.55];
@@ -39,6 +50,10 @@ export default function MapView({
   layers,
   selectedSiteId,
   onSelectSite,
+  pickMode = false,
+  onPickPoint,
+  pickedPoint = null,
+  pickedRadiusM,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -47,6 +62,7 @@ export default function MapView({
     reports: L.LayerGroup;
     risk: L.LayerGroup;
     locate: L.LayerGroup;
+    pick: L.LayerGroup;
   } | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
@@ -86,6 +102,7 @@ export default function MapView({
       sites: L.layerGroup().addTo(map),
       reports: L.layerGroup().addTo(map),
       locate: L.layerGroup().addTo(map),
+      pick: L.layerGroup().addTo(map),
     };
     mapRef.current = map;
 
@@ -168,6 +185,54 @@ export default function MapView({
       }
     }
   }, [sites, reports, riskCells, layers, selectedSiteId, onSelectSite]);
+
+  // Pick-a-point mode for the officer "Scan" tab — clicking the map reports
+  // the coordinates instead of the usual marker interactions.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !pickMode || !onPickPoint) return;
+
+    function handleClick(e: L.LeafletMouseEvent) {
+      onPickPoint?.(e.latlng.lat, e.latlng.lng);
+    }
+
+    const container = map.getContainer();
+    container.style.cursor = "crosshair";
+    map.on("click", handleClick);
+    return () => {
+      container.style.cursor = "";
+      map.off("click", handleClick);
+    };
+  }, [pickMode, onPickPoint]);
+
+  // Draw the picked scan center + its actual search radius, so the
+  // officer sees the real area rather than just a dot.
+  useEffect(() => {
+    const map = mapRef.current;
+    const groups = groupsRef.current;
+    if (!map || !groups) return;
+
+    groups.pick.clearLayers();
+    if (!pickedPoint) return;
+
+    if (pickedRadiusM) {
+      L.circle([pickedPoint.lat, pickedPoint.lng], {
+        radius: pickedRadiusM,
+        color: "#d4af37",
+        fillColor: "#d4af37",
+        fillOpacity: 0.1,
+        weight: 1.5,
+        dashArray: "4,3",
+      }).addTo(groups.pick);
+    }
+    L.circleMarker([pickedPoint.lat, pickedPoint.lng], {
+      radius: 6,
+      color: "#0a0a0a",
+      fillColor: "#d4af37",
+      fillOpacity: 1,
+      weight: 2,
+    }).addTo(groups.pick);
+  }, [pickedPoint, pickedRadiusM]);
 
   function handleLocate() {
     if (!navigator.geolocation) {
@@ -256,6 +321,12 @@ export default function MapView({
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
+
+      {pickMode && (
+        <div className="absolute left-1/2 top-4 z-[1000] -translate-x-1/2 rounded-full border border-gold-700 bg-black/90 px-4 py-2 text-xs font-medium text-gold-300 shadow-lg backdrop-blur">
+          Click the map to set the scan center
+        </div>
+      )}
 
       <button
         onClick={handleLocate}

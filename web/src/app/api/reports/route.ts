@@ -1,9 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { geocodeLocality } from "@/lib/localities";
+import { createRateLimiter, hashIdentifier, insertReportWithCorroboration } from "@/lib/reportIngest";
 
 export const runtime = "nodejs";
 
@@ -26,8 +27,9 @@ export const runtime = "nodejs";
  *     client-side writes.
  *
  * Expected SMS format (unchanged, provider-agnostic): "GALAM <locality>
- * <what you saw>". Corroboration rule: a second independent report
- * (different sender) within ~2 km upgrades both to "confirmed".
+ * <what you saw>". Corroboration rule (shared with the web report form —
+ * see lib/reportIngest.ts): a second independent report (different
+ * sender) within ~2 km upgrades both to "confirmed".
  *
  * Payload shape: httpsms wraps events as `{ event, data: { from/contact,
  * content/text, to/owner, ... } }`. This has been implemented from their
@@ -38,31 +40,12 @@ export const runtime = "nodejs";
  */
 
 const RawEvent = z.object({}).passthrough();
-
-const RATE_LIMIT = 5; // reports per sender per hour
-const RATE_WINDOW_MS = 60 * 60 * 1000;
-const NEARBY_DEG = 0.02; // ~2 km corroboration radius
-const rateBuckets = new Map<string, number[]>();
+const isRateLimited = createRateLimiter(5, 60 * 60 * 1000); // 5/sender/hour
 
 function constantTimeMatch(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
-}
-
-function hashPhone(phone: string, key: string): string {
-  return createHmac("sha256", key).update(phone.trim()).digest("hex");
-}
-
-function isRateLimited(phoneHash: string): boolean {
-  const now = Date.now();
-  const bucket = (rateBuckets.get(phoneHash) ?? []).filter(
-    (t) => now - t < RATE_WINDOW_MS
-  );
-  if (bucket.length >= RATE_LIMIT) return true;
-  bucket.push(now);
-  rateBuckets.set(phoneHash, bucket);
-  return false;
 }
 
 /** Pull { from, text } out of httpsms's event envelope, tolerating a few
@@ -117,7 +100,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "ignored" });
   }
 
-  const phoneHash = hashPhone(extracted.from, hashKey);
+  const phoneHash = hashIdentifier(extracted.from, hashKey);
   if (isRateLimited(phoneHash)) {
     return NextResponse.json({ error: "rate limited" }, { status: 429 });
   }
@@ -138,45 +121,16 @@ export async function POST(request: NextRequest) {
     auth: { persistSession: false },
   });
 
-  const { data: inserted, error } = await supabase
-    .from("community_reports")
-    .insert({
-      phone_hash: phoneHash,
-      message,
-      locality: geo?.locality ?? null,
-      lat: geo?.lat ?? null,
-      lng: geo?.lng ?? null,
-      status: "pending",
-    })
-    .select("id,lat,lng")
-    .single();
+  const result = await insertReportWithCorroboration(supabase, {
+    reporterHash: phoneHash,
+    message,
+    locality: geo?.locality ?? null,
+    lat: geo?.lat ?? null,
+    lng: geo?.lng ?? null,
+  });
 
-  if (error || !inserted) {
+  if ("error" in result) {
     return NextResponse.json({ error: "storage failed" }, { status: 500 });
   }
-
-  // Corroboration: another pending report nearby from a DIFFERENT sender
-  // upgrades both to confirmed (the "two independent reports" rule).
-  if (geo) {
-    const { data: nearby } = await supabase
-      .from("community_reports")
-      .select("id")
-      .eq("status", "pending")
-      .neq("id", inserted.id)
-      .neq("phone_hash", phoneHash)
-      .gte("lat", geo.lat - NEARBY_DEG)
-      .lte("lat", geo.lat + NEARBY_DEG)
-      .gte("lng", geo.lng - NEARBY_DEG)
-      .lte("lng", geo.lng + NEARBY_DEG);
-
-    if (nearby && nearby.length > 0) {
-      const ids = [inserted.id, ...nearby.map((r) => r.id)];
-      await supabase
-        .from("community_reports")
-        .update({ status: "confirmed" })
-        .in("id", ids);
-    }
-  }
-
   return NextResponse.json({ status: "received" });
 }

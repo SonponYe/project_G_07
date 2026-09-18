@@ -7,6 +7,7 @@ of confirmed_sites and risk_scores.
 
 import os
 import uuid
+from datetime import datetime, timezone
 
 from supabase import Client, create_client
 
@@ -51,10 +52,15 @@ def _upload_image(client: Client, bucket: str, path: str, data: bytes | None) ->
         return None
 
 
-def push_sites(client: Client, sites: list[dict]) -> int:
+def push_sites(client: Client, sites: list[dict], pipeline_run_id: str | None = None) -> int:
     """Insert newly detected sites. Skips near-duplicates (~100 m) within
     the same basin, and uploads before/after images to permanent storage
-    first so the dashboard never depends on a live Earth Engine link."""
+    first so the dashboard never depends on a live Earth Engine link.
+
+    `pipeline_run_id` tags sites from an officer-requested targeted scan
+    (see pipeline_runs table) so they can be traced back to the request
+    that found them — omitted for ordinary whole-basin runs.
+    """
     _ensure_image_bucket(client, config.SUPABASE_IMAGE_BUCKET)
 
     inserted = 0
@@ -94,6 +100,8 @@ def push_sites(client: Client, sites: list[dict]) -> int:
         # A satellite flag or auto-corroborated SMS match is evidence,
         # not proof; mislabeling a farm as a mine in public is a real risk.
         site["review_status"] = "pending_review"
+        if pipeline_run_id is not None:
+            site["pipeline_run_id"] = pipeline_run_id
 
         client.table("confirmed_sites").insert(site).execute()
         inserted += 1
@@ -115,3 +123,52 @@ def replace_risk_grid(client: Client, basin: str, rows: list[dict]) -> int:
         for i in range(0, len(rows), batch_size):
             client.table("risk_scores").insert(rows[i : i + batch_size]).execute()
     return len(rows)
+
+
+# ── Officer-requested pipeline run queue ────────────────────────────────────
+# An officer submits a center point + radius from the dashboard; it lands
+# here as a 'queued' row (RLS lets officers insert but never update status/
+# results — only the service role, i.e. this module, does that). Drained by
+# `run_pipeline.py --from-queue`, run manually for now — see README.
+
+
+def get_queued_runs(client: Client) -> list[dict]:
+    result = (
+        client.table("pipeline_runs")
+        .select("*")
+        .eq("status", "queued")
+        .order("created_at")
+        .execute()
+    )
+    return result.data or []
+
+
+def _now_iso() -> str:
+    # A literal "now()" string would go through Supabase's REST API as
+    # data, not SQL — it'd try to store the text "now()" in a timestamptz
+    # column rather than evaluating it. Compute the real timestamp here.
+    return datetime.now(timezone.utc).isoformat()
+
+
+def mark_run_running(client: Client, run_id: str) -> None:
+    client.table("pipeline_runs").update(
+        {"status": "running", "started_at": _now_iso()}
+    ).eq("id", run_id).execute()
+
+
+def mark_run_done(client: Client, run_id: str, sites_found: int) -> None:
+    client.table("pipeline_runs").update(
+        {"status": "done", "completed_at": _now_iso(), "sites_found": sites_found}
+    ).eq("id", run_id).execute()
+
+
+def mark_run_failed(client: Client, run_id: str, error_message: str) -> None:
+    client.table("pipeline_runs").update(
+        {
+            "status": "failed",
+            "completed_at": _now_iso(),
+            # Truncated defensively — this is diagnostic text, not data a
+            # column-length surprise should ever break a queue drain over.
+            "error_message": error_message[:2000],
+        }
+    ).eq("id", run_id).execute()

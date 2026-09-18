@@ -107,13 +107,18 @@ def _local_centroid_area(geojson_polygon: dict) -> tuple[list[float], float]:
     return [centroid.x, centroid.y], area_ha
 
 
-def detect_change(basin_key: str) -> list[dict]:
-    """Run vegetation→bare-ground change detection for a basin.
+def detect_change(basin_key: str, bbox: list[float] | None = None) -> list[dict]:
+    """Run vegetation→bare-ground change detection over a region.
 
-    Returns a list of site dicts ready for Supabase upsert.
+    By default scans the named basin's full bbox. Pass `bbox` (as
+    [min_lng, min_lat, max_lng, max_lat], e.g. from
+    config.bbox_from_center) to scan a smaller officer-requested area
+    instead — `basin_key` is still used to tag results and pick which
+    basin's river/reserve data scores them, it just no longer dictates
+    the search area.
     """
     basin = config.BASINS[basin_key]
-    geom = ee.Geometry.Rectangle(basin["bbox"])
+    geom = ee.Geometry.Rectangle(bbox if bbox is not None else basin["bbox"])
 
     before = _dw_mode(geom, *config.BEFORE_WINDOW)
     after = _dw_mode(geom, *config.AFTER_WINDOW)

@@ -2,7 +2,7 @@
   "name": "G07",
   "short_name": "G07",
   "description": "Satellite + community detection and prediction of illegal mining in Ghana's river basins.",
-  "start_url": "/",
+  "start_url": "/map",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

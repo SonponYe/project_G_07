@@ -104,3 +104,21 @@ FOREST_RESERVES_GEOJSON = "data/forest_reserves.geojson"
 # reload, so the pipeline downloads the bytes once and re-hosts them here —
 # the dashboard/demo should never depend on a live Earth Engine request.
 SUPABASE_IMAGE_BUCKET = "site-images"
+
+# ── Officer-requested, radius-scoped runs ───────────────────────────────────
+_METERS_PER_DEG_LAT = 111_320  # ~constant everywhere
+
+
+def bbox_from_center(lat: float, lng: float, radius_m: float) -> list[float]:
+    """[min_lng, min_lat, max_lng, max_lat] for a circle's bounding square,
+    used for officer-requested targeted scans (a point + radius) instead of
+    a whole named basin. Longitude degrees shrink with latitude — a fixed
+    111,320 m/deg only holds for latitude, so it's corrected by cos(lat)
+    here, same approximation already used in detect.py/risk.py (Ghana's
+    ~5-8°N keeps the error under ~1%).
+    """
+    import math
+
+    deg_lat = radius_m / _METERS_PER_DEG_LAT
+    deg_lng = radius_m / (_METERS_PER_DEG_LAT * math.cos(math.radians(lat)))
+    return [lng - deg_lng, lat - deg_lat, lng + deg_lng, lat + deg_lat]

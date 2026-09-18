@@ -6,8 +6,12 @@ import type {
   CommunityReport,
   ConfirmedSite,
   DashboardData,
+  PipelineRun,
   RiskCell,
 } from "./types";
+
+const PIPELINE_RUN_COLUMNS =
+  "id,center_lat,center_lng,radius_m,basin,label,notes,report_id,status,sites_found,error_message,created_at,started_at,completed_at";
 
 const SITE_COLUMNS =
   "id,name,lat,lng,area_ha,detected_at,detection_source,ndwi_drop,water_corroborated,review_status,officer_notes,before_image_url,after_image_url,basin";
@@ -108,6 +112,24 @@ export async function getOfficerDashboardData(): Promise<DashboardData> {
   }
 }
 
+/** Officer-only — the pipeline_runs queue. Empty array on any failure
+ * (missing config, not signed in, RLS denial) rather than throwing, since
+ * this is a secondary panel that shouldn't break the whole dashboard. */
+export async function getPipelineRuns(): Promise<PipelineRun[]> {
+  try {
+    const supabase = await createAuthedClient();
+    const { data, error } = await supabase
+      .from("pipeline_runs")
+      .select(PIPELINE_RUN_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error || !data) return [];
+    return data.map(mapPipelineRun);
+  } catch {
+    return [];
+  }
+}
+
 function demoData(): DashboardData {
   return {
     demoMode: true,
@@ -161,5 +183,24 @@ function mapRisk(row: any): RiskCell {
     factors: row.factors ?? {},
     windowDays: row.window_days,
     computedAt: row.computed_at,
+  };
+}
+
+function mapPipelineRun(row: any): PipelineRun {
+  return {
+    id: row.id,
+    centerLat: row.center_lat,
+    centerLng: row.center_lng,
+    radiusM: row.radius_m,
+    basin: row.basin,
+    label: row.label,
+    notes: row.notes,
+    reportId: row.report_id,
+    status: row.status,
+    sitesFound: row.sites_found,
+    errorMessage: row.error_message,
+    createdAt: row.created_at,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
   };
 }

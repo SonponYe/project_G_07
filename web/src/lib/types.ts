@@ -66,3 +66,24 @@ export interface LayerVisibility {
   reports: boolean;
   risk: boolean;
 }
+
+export type PipelineRunStatus = "queued" | "running" | "done" | "failed";
+
+/** An officer-requested targeted scan (center point + radius) — see
+ * pipeline_runs table and pipeline/run_pipeline.py --from-queue. */
+export interface PipelineRun {
+  id: string;
+  centerLat: number;
+  centerLng: number;
+  radiusM: number;
+  basin: string;
+  label: string | null;
+  notes: string | null;
+  reportId: string | null;
+  status: PipelineRunStatus;
+  sitesFound: number | null;
+  errorMessage: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}

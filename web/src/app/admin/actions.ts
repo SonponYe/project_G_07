@@ -21,7 +21,7 @@ export async function setSiteReview(id: string, status: "published" | "rejected"
     .eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin");
-  revalidatePath("/");
+  revalidatePath("/map");
 }
 
 export async function setReportStatus(id: string, status: "confirmed" | "rejected") {
@@ -32,7 +32,40 @@ export async function setReportStatus(id: string, status: "confirmed" | "rejecte
     .eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/admin");
-  revalidatePath("/");
+  revalidatePath("/map");
+}
+
+/** Officer requests a targeted scan (center + radius) instead of an
+ * officer having to wait for/ask for a whole-basin run. Lands as a
+ * 'queued' row — see pipeline_runs and pipeline/run_pipeline.py
+ * --from-queue for how it actually gets fulfilled. */
+export async function requestPipelineRun(input: {
+  centerLat: number;
+  centerLng: number;
+  radiusM: number;
+  basin: string;
+  label: string;
+  notes: string;
+  reportId: string | null;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in.");
+
+  const { error } = await supabase.from("pipeline_runs").insert({
+    requested_by: user.id,
+    center_lat: input.centerLat,
+    center_lng: input.centerLng,
+    radius_m: input.radiusM,
+    basin: input.basin,
+    label: input.label || null,
+    notes: input.notes || null,
+    report_id: input.reportId,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin");
 }
 
 export async function signOutAction() {

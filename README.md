@@ -6,9 +6,10 @@ Originally built for the Pan-African AI Summit Hackathon 2026 (ClimateTech Track
 
 ## Status
 
-- **233 real illegal-mining candidate sites** detected from live Google Earth Engine data over the Pra river basin, each with genuine Sentinel-2 before/after imagery and an NDWI water-turbidity cross-check.
+- **238 real illegal-mining candidate sites** detected from live Google Earth Engine data over the Pra river basin, each with genuine Sentinel-2 before/after imagery and an NDWI water-turbidity cross-check.
 - **1,464-cell predictive risk grid** computed and live.
-- Public dashboard + an authenticated officer moderation portal (`/admin`) both running.
+- A public landing page, a public map + web report form, and an authenticated officer moderation portal (`/admin`) — three surfaces, one backend.
+- Officers can request a **targeted scan** (a point + radius) instead of waiting on a whole-basin run — built specifically to respond to a fresh citizen tip.
 - Installable as a PWA on phone or desktop; fully responsive with a retractable mobile drawer and bottom-sheet site panel.
 - Deployed via Vercel; source mirrored on both GitHub and GitLab.
 
@@ -29,7 +30,7 @@ npm install
 npm run dev        # http://localhost:3000
 
 # Connect live data: copy web/.env.example → web/.env.local, fill in
-# Supabase keys, and run supabase/migrations (0001, 0002) + supabase/seed.sql once.
+# Supabase keys, and run supabase/migrations (0001, 0002, 0003) + supabase/seed.sql once.
 
 # Pipeline (needs a Google Earth Engine account)
 cd pipeline
@@ -67,12 +68,14 @@ No training data, no model fitting — every score's factor breakdown is stored 
 ### Layer 5 — Officer moderation
 New automated detections and auto-corroborated reports land as `pending_review`, **not** immediately public — a satellite flag or an SMS match is evidence, not proof, and mislabeling a farm as a mine in public carries real reputational and legal risk. A signed-in officer reviews the queue at `/admin` and publishes or rejects each one. Enforced at the database level via Postgres Row Level Security, not just hidden in the UI.
 
-## Two Experiences: Public vs. Authority
+### Layer 6 — Officer-requested targeted scans
+The default pipeline run scans one basin's entire bounding box (~85×133km for Pra) — mostly empty land, and slow. An officer can instead request a scan of just a point + radius (100m–20km) from `/admin`'s **Scan** tab — pick a spot on the map or link it directly to a pending citizen report — which queues a row in `pipeline_runs`. The pipeline drains that queue (`python run_pipeline.py --from-queue`, run manually for now) and pushes any new sites it finds, tagged back to the request that triggered it. Deliberately scoped to detection only — it never touches the basin-wide risk grid, since naively regenerating that from a tiny search area would wipe out the real one.
 
-The same map serves two audiences with different needs, gated by role rather than duplicated code:
+## Three Surfaces, One Backend
 
-- **Public dashboard** (`/`) — open to anyone, no login. Friendly framing, the SMS-reporting card, map layer toggles, and the risk heatmap. Only ever shows `published` sites and non-rejected reports — enforced by Row Level Security, not application logic.
-- **Authority Portal** (`/login`, `/admin`) — officer/admin accounts only (EPA, Forestry Commission, task force staff), provisioned manually, no public self-signup. Adds a moderation queue for new detections and pending reports, GeoJSON export tools, and officer annotation notes on sites.
+- **Landing page** (`/`) — the public front door. What G07 does, live impact numbers, and links into the other two surfaces. No login.
+- **Public map + report form** (`/map`, `/report`) — the interactive map (layer toggles, risk heatmap, before/after photos) plus a web form for reporting a site without SMS. The form requires sharing your location — no manual entry — so every web report is plotted from a real GPS fix. Only ever shows `published` sites and non-rejected reports, enforced by Row Level Security, not application logic.
+- **Authority Portal** (`/login`, `/admin`) — officer/admin accounts only (EPA, Forestry Commission, task force staff), provisioned manually, no public self-signup. Adds the moderation queue, the targeted-scan request form, GeoJSON export tools, and officer annotation notes on sites.
 
 ## Progressive Web App
 
@@ -110,14 +113,15 @@ A "Locate me" control requests the browser's location on tap (never automaticall
 
 ## Data Model
 
-Four tables in the `public` schema (see `supabase/migrations/`):
+Five tables in the `public` schema (see `supabase/migrations/`):
 
 | Table | Purpose |
 |---|---|
-| `confirmed_sites` | Detected/reported mining sites — coordinates, area, before/after image URLs, NDWI corroboration, `review_status` (`pending_review` / `published` / `rejected`), officer notes |
-| `community_reports` | SMS reports — hashed sender, message, locality, status, matched site |
+| `confirmed_sites` | Detected/reported mining sites — coordinates, area, before/after image URLs, NDWI corroboration, `review_status` (`pending_review` / `published` / `rejected`), officer notes, and the `pipeline_run_id` that found it, if any |
+| `community_reports` | Reports from SMS or the web form — hashed sender (phone or IP), message, locality, status, matched site |
 | `risk_scores` | The predictive grid — one row per cell with score and full factor breakdown |
 | `profiles` | Officer/admin role assignments, linked to Supabase Auth users |
+| `pipeline_runs` | Officer-requested targeted scans — center point, radius, status (`queued`/`running`/`done`/`failed`), sites found, optional link to the report that prompted it |
 
 **Security model**, enforced in Postgres, not just the app:
 - RLS gives anonymous/public reads **SELECT only**, and only on `published` sites — no INSERT/UPDATE/DELETE policy exists for public roles.
@@ -162,7 +166,8 @@ The web app deploys to Vercel; Supabase hosts everything else and needs no separ
 
 - **Forest reserve boundaries** are a labeled placeholder polygon, not official Ghana Forestry Commission data.
 - **Gold-price multiplier** is stubbed neutral; no live market feed connected.
-- **No automated recurring pipeline runs** — every run is manual (`python run_pipeline.py`). Fine for the current cadence (land clearing takes months to show up in a 3-month satellite comparison anyway); a scheduled job (e.g. GitHub Actions cron) would be a small addition later.
+- **No automated recurring pipeline runs** — every run is manual (`python run_pipeline.py`), including draining the officer-requested scan queue (`--from-queue`). Fine for the current cadence (land clearing takes months to show up in a 3-month satellite comparison anyway); a scheduled job (e.g. GitHub Actions cron) would be a small addition later.
+- **Targeted scans don't refresh the risk grid** — by design, to avoid a small-radius run wiping out the basin-wide grid (see Layer 6). If a targeted scan should also update nearby risk scores, that needs a proper scoped-delete, not yet built.
 - **Single basin (Pra)** — the config supports two backup basins (Ankobra, Offin) but only Pra has been run for real.
 - **SMS relies on one physical Android phone (httpsms)** — a real single point of failure (dead battery, lost signal, app killed). Fine for a pilot; Africa's Talking (production telecom infrastructure) is the better choice before this is depended on for real. The webhook's httpsms payload parsing also hasn't been exercised against a live message yet — see the comment in `api/reports/route.ts` if the first real report doesn't land.
 

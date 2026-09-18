@@ -4,10 +4,15 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import { setReportStatus, signOutAction } from "@/app/admin/actions";
+import { requestPipelineRun, setReportStatus, signOutAction } from "@/app/admin/actions";
 import type { Viewer } from "@/lib/auth";
 import { exportHighRiskGeoJSON, exportSitesGeoJSON } from "@/lib/export";
-import type { ConfirmedSite, DashboardData, LayerVisibility } from "@/lib/types";
+import type {
+  ConfirmedSite,
+  DashboardData,
+  LayerVisibility,
+  PipelineRun,
+} from "@/lib/types";
 
 import { IconClose, IconMark, IconMenu } from "./icons";
 import LayerControls from "./LayerControls";
@@ -25,14 +30,25 @@ const MapView = dynamic(() => import("./MapView"), {
   ),
 });
 
-type SidebarTab = "queue" | "layers";
+type SidebarTab = "queue" | "scan" | "layers";
+
+const RUN_STATUS_STYLE: Record<PipelineRun["status"], string> = {
+  queued: "border-neutral-600 text-neutral-400",
+  running: "border-gold-600 text-gold-400",
+  done: "border-emerald-700 text-emerald-400",
+  failed: "border-red-800 text-red-400",
+};
 
 export default function Dashboard({
   initial,
   viewer,
+  pipelineRuns,
 }: {
   initial: DashboardData;
   viewer: Viewer | null;
+  /** Only ever provided on /admin — its presence is what gates the Scan
+   * tab, since a request only makes sense where an officer is looking. */
+  pipelineRuns?: PipelineRun[];
 }) {
   const [layers, setLayers] = useState<LayerVisibility>({
     sites: true,
@@ -48,6 +64,18 @@ export default function Dashboard({
   const isOfficer = viewer?.role === "officer" || viewer?.role === "admin";
   const onAdmin = pathname === "/admin";
   const [tab, setTab] = useState<SidebarTab>("queue");
+
+  // ── Scan (officer-requested targeted pipeline run) ──────────────────────
+  const [pickMode, setPickMode] = useState(false);
+  const [centerLat, setCenterLat] = useState("");
+  const [centerLng, setCenterLng] = useState("");
+  const [radiusM, setRadiusM] = useState("2000");
+  const [scanLabel, setScanLabel] = useState("");
+  const [scanNotes, setScanNotes] = useState("");
+  const [scanReportId, setScanReportId] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanSubmitting, setScanSubmitting] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
 
   const stats = useMemo(
     () => ({
@@ -76,6 +104,69 @@ export default function Dashboard({
     setSelectedSite(site);
     setSidebarOpen(false);
   }
+
+  function handlePickPoint(lat: number, lng: number) {
+    setCenterLat(lat.toFixed(5));
+    setCenterLng(lng.toFixed(5));
+    setPickMode(false);
+  }
+
+  function handleSelectReport(reportId: string) {
+    setScanReportId(reportId || null);
+    if (!reportId) return;
+    const report = initial.reports.find((r) => r.id === reportId);
+    if (report?.lat != null && report?.lng != null) {
+      setCenterLat(report.lat.toFixed(5));
+      setCenterLng(report.lng.toFixed(5));
+    }
+  }
+
+  async function handleScanSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setScanError(null);
+    setScanSuccess(false);
+
+    const lat = parseFloat(centerLat);
+    const lng = parseFloat(centerLng);
+    const radius = parseInt(radiusM, 10);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      setScanError("Enter a valid latitude and longitude, or pick a point on the map.");
+      return;
+    }
+    if (Number.isNaN(radius) || radius < 100 || radius > 20000) {
+      setScanError("Radius must be between 100 and 20,000 metres.");
+      return;
+    }
+
+    setScanSubmitting(true);
+    try {
+      await requestPipelineRun({
+        centerLat: lat,
+        centerLng: lng,
+        radiusM: radius,
+        basin: "pra",
+        label: scanLabel,
+        notes: scanNotes,
+        reportId: scanReportId,
+      });
+      setScanSuccess(true);
+      setCenterLat("");
+      setCenterLng("");
+      setScanLabel("");
+      setScanNotes("");
+      setScanReportId(null);
+      router.refresh();
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "Failed to submit — try again.");
+    } finally {
+      setScanSubmitting(false);
+    }
+  }
+
+  const pickedPoint =
+    centerLat && centerLng && !Number.isNaN(parseFloat(centerLat)) && !Number.isNaN(parseFloat(centerLng))
+      ? { lat: parseFloat(centerLat), lng: parseFloat(centerLng) }
+      : null;
 
   return (
     <div className="flex h-screen flex-col bg-ink-950">
@@ -124,7 +215,7 @@ export default function Dashboard({
           {isOfficer ? (
             <>
               <a
-                href={onAdmin ? "/" : "/admin"}
+                href={onAdmin ? "/map" : "/admin"}
                 className="rounded-md border border-gold-600 bg-gold-500/10 px-2 py-1 font-medium text-gold-300 hover:bg-gold-500/20 sm:px-2.5"
               >
                 <span className="sm:hidden">{onAdmin ? "Public" : "Queue"}</span>
@@ -229,6 +320,18 @@ export default function Dashboard({
                 >
                   Queue{totalToReview > 0 ? ` (${totalToReview})` : ""}
                 </button>
+                {pipelineRuns !== undefined && (
+                  <button
+                    onClick={() => setTab("scan")}
+                    className={`rounded-t-md px-3 py-2 text-xs font-medium ${
+                      tab === "scan"
+                        ? "border-b-2 border-gold-500 text-gold-300"
+                        : "text-neutral-500 hover:text-neutral-300"
+                    }`}
+                  >
+                    Scan
+                  </button>
+                )}
                 <button
                   onClick={() => setTab("layers")}
                   className={`rounded-t-md px-3 py-2 text-xs font-medium ${
@@ -242,7 +345,7 @@ export default function Dashboard({
               </div>
 
               <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-                {tab === "queue" ? (
+                {tab === "queue" && (
                   <>
                     {totalToReview === 0 ? (
                       <p className="text-xs text-neutral-500">
@@ -336,7 +439,156 @@ export default function Dashboard({
                       </>
                     )}
                   </>
-                ) : (
+                )}
+
+                {tab === "scan" && pipelineRuns !== undefined && (
+                  <>
+                    <form onSubmit={handleScanSubmit} className="flex flex-col gap-3">
+                      <div>
+                        <p className="mb-1 text-[11px] font-medium text-neutral-400">
+                          Center point
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setPickMode((v) => !v)}
+                          className={`w-full rounded-md border px-2.5 py-1.5 text-xs font-medium ${
+                            pickMode
+                              ? "border-gold-500 bg-gold-500/10 text-gold-300"
+                              : "border-ink-700 text-neutral-300 hover:border-gold-700"
+                          }`}
+                        >
+                          {pickMode ? "Click the map…" : "Pick on map"}
+                        </button>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <input
+                            type="number"
+                            step="any"
+                            required
+                            placeholder="Latitude"
+                            value={centerLat}
+                            onChange={(e) => setCenterLat(e.target.value)}
+                            className="rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:border-gold-500"
+                          />
+                          <input
+                            type="number"
+                            step="any"
+                            required
+                            placeholder="Longitude"
+                            value={centerLng}
+                            onChange={(e) => setCenterLng(e.target.value)}
+                            className="rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:border-gold-500"
+                          />
+                        </div>
+                      </div>
+
+                      {initial.reports.filter((r) => r.status === "pending" && r.lat != null).length >
+                        0 && (
+                        <label className="flex flex-col gap-1 text-[11px] text-neutral-400">
+                          Or link to a pending report
+                          <select
+                            value={scanReportId ?? ""}
+                            onChange={(e) => handleSelectReport(e.target.value)}
+                            className="rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:border-gold-500"
+                          >
+                            <option value="">None</option>
+                            {initial.reports
+                              .filter((r) => r.status === "pending" && r.lat != null)
+                              .map((r) => (
+                                <option key={r.id} value={r.id}>
+                                  {r.locality ?? "unknown"} — {r.message.slice(0, 40)}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                      )}
+
+                      <label className="flex flex-col gap-1 text-[11px] text-neutral-400">
+                        Radius (metres, 100–20,000)
+                        <input
+                          type="number"
+                          min={100}
+                          max={20000}
+                          required
+                          value={radiusM}
+                          onChange={(e) => setRadiusM(e.target.value)}
+                          className="rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:border-gold-500"
+                        />
+                      </label>
+
+                      <label className="flex flex-col gap-1 text-[11px] text-neutral-400">
+                        Label (optional)
+                        <input
+                          type="text"
+                          maxLength={120}
+                          placeholder="e.g. Daboase tip-off"
+                          value={scanLabel}
+                          onChange={(e) => setScanLabel(e.target.value)}
+                          className="rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:border-gold-500"
+                        />
+                      </label>
+
+                      <label className="flex flex-col gap-1 text-[11px] text-neutral-400">
+                        Notes (optional)
+                        <textarea
+                          rows={2}
+                          maxLength={500}
+                          value={scanNotes}
+                          onChange={(e) => setScanNotes(e.target.value)}
+                          className="rounded-md border border-ink-700 bg-ink-950 px-2.5 py-1.5 text-xs text-neutral-100 outline-none focus:border-gold-500"
+                        />
+                      </label>
+
+                      {scanError && <p className="text-xs text-red-400">{scanError}</p>}
+                      {scanSuccess && (
+                        <p className="text-xs text-emerald-400">
+                          Scan requested — it'll run next time the pipeline drains the queue.
+                        </p>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={scanSubmitting}
+                        className="rounded-md bg-gold-500 px-3 py-2 text-xs font-semibold text-black hover:bg-gold-400 disabled:opacity-50"
+                      >
+                        {scanSubmitting ? "Requesting…" : "Request scan"}
+                      </button>
+                    </form>
+
+                    {pipelineRuns.length > 0 && (
+                      <section>
+                        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                          Past requests
+                        </h2>
+                        <div className="flex flex-col gap-2">
+                          {pipelineRuns.map((run) => (
+                            <div
+                              key={run.id}
+                              className="rounded-md border border-ink-700 bg-ink-900 p-2.5 text-xs"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-neutral-200">
+                                  {run.label || `${run.centerLat.toFixed(3)}, ${run.centerLng.toFixed(3)}`}
+                                </span>
+                                <span
+                                  className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] ${RUN_STATUS_STYLE[run.status]}`}
+                                >
+                                  {run.status}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-[10px] text-neutral-600">
+                                {(run.radiusM / 1000).toFixed(1)}km radius
+                                {run.sitesFound != null ? ` · ${run.sitesFound} site(s) found` : ""}
+                                {run.errorMessage ? ` · ${run.errorMessage}` : ""}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                  </>
+                )}
+
+                {tab === "layers" && (
                   <>
                     <LayerControls layers={layers} onChange={setLayers} />
                     <Legend isOfficer={isOfficer} />
@@ -391,6 +643,10 @@ export default function Dashboard({
             layers={layers}
             selectedSiteId={selectedSite?.id ?? null}
             onSelectSite={setSelectedSite}
+            pickMode={tab === "scan" && pickMode}
+            onPickPoint={handlePickPoint}
+            pickedPoint={tab === "scan" ? pickedPoint : null}
+            pickedRadiusM={tab === "scan" ? parseInt(radiusM, 10) || undefined : undefined}
           />
           {selectedSite && (
             <SitePanel

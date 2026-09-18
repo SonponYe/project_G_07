@@ -107,7 +107,7 @@ export default function LoginPage() {
           )}
 
           <a
-            href="/"
+            href="/map"
             className="mt-5 flex items-center justify-center gap-1 text-center text-xs text-neutral-600 hover:text-gold-500"
           >
             <IconChevronLeft className="h-3 w-3" />

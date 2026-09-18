@@ -4,6 +4,7 @@ Usage:
   python run_pipeline.py --basin pra                 # full run → Supabase
   python run_pipeline.py --basin pra --dry-run       # write GeoJSON to out/, no DB writes
   python run_pipeline.py --basin pra --skip-detect   # risk grid only (reuses DB sites)
+  python run_pipeline.py --from-queue                # drain officer-requested targeted scans
 
 First-time setup:
   pip install -r requirements.txt
@@ -85,11 +86,66 @@ def build_slope_lookup(basin_key: str):
         return None
 
 
+def run_from_queue() -> None:
+    """Drain officer-requested targeted scans (pipeline_runs, status =
+    'queued') — a center point + radius instead of a whole basin, e.g. "2km
+    around this citizen report" rather than scanning 85x133km of mostly
+    empty basin.
+
+    Deliberately does NOT touch risk_scores: replace_risk_grid() deletes
+    every existing cell for the basin before inserting the fresh set —
+    correct for a whole-basin run, but running it here with only a
+    handful of small-radius cells would wipe out the basin's entire real
+    risk grid. Targeted runs only add detected sites; refreshing the risk
+    grid stays a separate, explicit `--skip-detect` whole-basin pass.
+    """
+    import detect
+    import push
+    import water_check
+
+    detect.init_ee(os.environ.get("EE_PROJECT") or None)
+    client = push.get_client()
+
+    runs = push.get_queued_runs(client)
+    if not runs:
+        print("No queued pipeline runs.")
+        return
+
+    print(f"{len(runs)} queued run(s) to process…")
+    for run in runs:
+        run_id = run["id"]
+        label = run.get("label") or run_id
+        print(f"\n[{label}] center=({run['center_lat']}, {run['center_lng']}) radius={run['radius_m']}m")
+        push.mark_run_running(client, run_id)
+        try:
+            bbox = config.bbox_from_center(run["center_lat"], run["center_lng"], run["radius_m"])
+            sites = detect.detect_change(run["basin"], bbox=bbox)
+            print(f"  {len(sites)} candidate site(s) found")
+
+            for site in sites:
+                drop = water_check.ndwi_drop(site["lat"], site["lng"])
+                site["ndwi_drop"] = drop
+                site["water_corroborated"] = (
+                    drop is not None and drop < config.NDWI_DROP_THRESHOLD
+                )
+
+            n = push.push_sites(client, sites, pipeline_run_id=run_id)
+            push.mark_run_done(client, run_id, sites_found=n)
+            print(f"  done — {n} new site(s) pushed, pending officer review")
+        except Exception as exc:  # noqa: BLE001 — one bad run shouldn't kill the queue
+            print(f"  [warn] run failed: {exc}")
+            push.mark_run_failed(client, run_id, str(exc))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Galamsey Eye data pipeline")
     parser.add_argument("--basin", default=config.DEFAULT_BASIN, choices=config.BASINS)
     parser.add_argument("--dry-run", action="store_true", help="write out/ files, no DB")
     parser.add_argument("--skip-detect", action="store_true", help="risk grid only")
+    parser.add_argument(
+        "--from-queue", action="store_true",
+        help="drain officer-requested targeted scans (pipeline_runs table) instead of a whole basin",
+    )
     parser.add_argument(
         "--limit", type=int, default=None,
         help="only process the first N detected sites — use for a small live "
@@ -99,6 +155,10 @@ def main() -> None:
 
     # Load secrets from repo-root .env (never hardcoded).
     load_dotenv(Path(__file__).parent.parent / ".env")
+
+    if args.from_queue:
+        run_from_queue()
+        return
 
     sites: list[dict] = []
 
