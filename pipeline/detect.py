@@ -10,6 +10,7 @@ continuously updated 10 m land-cover classification.
 """
 
 import math
+import os
 import time
 
 import ee
@@ -22,9 +23,23 @@ import config
 def init_ee(project: str) -> None:
     """Authenticate + initialize Earth Engine.
 
-    First run on a new machine requires `earthengine authenticate` once.
+    Two paths:
+      - Local/manual runs: `earthengine authenticate` once (interactive
+        browser OAuth, tied to a personal Google account).
+      - Scheduled/CI runs (GitHub Actions — see --from-queue and
+        .github/workflows/drain-pipeline-queue.yml): no browser available,
+        so a Google Cloud service account is used instead. Set
+        EE_SERVICE_ACCOUNT_EMAIL and EE_SERVICE_ACCOUNT_KEY (the key
+        file's JSON content) and this path is used automatically —
+        nothing else in the pipeline needs to know which one ran.
     """
-    ee.Initialize(project=project)
+    sa_email = os.environ.get("EE_SERVICE_ACCOUNT_EMAIL")
+    sa_key = os.environ.get("EE_SERVICE_ACCOUNT_KEY")
+    if sa_email and sa_key:
+        credentials = ee.ServiceAccountCredentials(sa_email, key_data=sa_key)
+        ee.Initialize(credentials, project=project)
+    else:
+        ee.Initialize(project=project)
 
 
 def _dw_mode(geom: ee.Geometry, start: str, end: str) -> ee.Image:

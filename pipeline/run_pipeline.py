@@ -98,19 +98,24 @@ def run_from_queue() -> None:
     handful of small-radius cells would wipe out the basin's entire real
     risk grid. Targeted runs only add detected sites; refreshing the risk
     grid stays a separate, explicit `--skip-detect` whole-basin pass.
+
+    Checks the queue BEFORE touching Earth Engine at all — this runs on a
+    schedule (see .github/workflows/drain-pipeline-queue.yml) where an
+    empty queue is the common case, so there's no reason to pay for an
+    Earth Engine auth handshake on every tick when there's nothing to do.
     """
-    import detect
     import push
-    import water_check
 
-    detect.init_ee(os.environ.get("EE_PROJECT") or None)
     client = push.get_client()
-
     runs = push.get_queued_runs(client)
     if not runs:
         print("No queued pipeline runs.")
         return
 
+    import detect
+    import water_check
+
+    detect.init_ee(os.environ.get("EE_PROJECT") or None)
     print(f"{len(runs)} queued run(s) to process…")
     for run in runs:
         run_id = run["id"]

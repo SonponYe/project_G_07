@@ -41,7 +41,7 @@ python run_pipeline.py --basin pra --dry-run
 
 Repository layout and the purpose of every file: see [project_breakdown.md](project_breakdown.md).
 
-## How It Works — Five Layers
+## How It Works — Six Layers
 
 ### Layer 1 — Detection
 Queries Google Earth Engine's **Dynamic World** dataset (`GOOGLE/DYNAMICWORLD/V1`) — a continuously updating, 10 m-resolution land-cover classification built on Sentinel-2 imagery, already trained and maintained by Google. Two time slices (~3 months apart) are pulled over the basin, and pixel clusters that flipped from vegetation to bare ground are flagged. Real before/after satellite photos are downloaded for every candidate site and re-hosted permanently in Supabase Storage (Earth Engine's own thumbnail links are ephemeral, so the dashboard never depends on a live Earth Engine call).
@@ -69,7 +69,7 @@ No training data, no model fitting — every score's factor breakdown is stored 
 New automated detections and auto-corroborated reports land as `pending_review`, **not** immediately public — a satellite flag or an SMS match is evidence, not proof, and mislabeling a farm as a mine in public carries real reputational and legal risk. A signed-in officer reviews the queue at `/admin` and publishes or rejects each one. Enforced at the database level via Postgres Row Level Security, not just hidden in the UI.
 
 ### Layer 6 — Officer-requested targeted scans
-The default pipeline run scans one basin's entire bounding box (~85×133km for Pra) — mostly empty land, and slow. An officer can instead request a scan of just a point + radius (100m–20km) from `/admin`'s **Scan** tab — pick a spot on the map or link it directly to a pending citizen report — which queues a row in `pipeline_runs`. The pipeline drains that queue (`python run_pipeline.py --from-queue`, run manually for now) and pushes any new sites it finds, tagged back to the request that triggered it. Deliberately scoped to detection only — it never touches the basin-wide risk grid, since naively regenerating that from a tiny search area would wipe out the real one.
+The default pipeline run scans one basin's entire bounding box (~85×133km for Pra) — mostly empty land, and slow. An officer can instead request a scan of just a point + radius (100m–20km) from `/admin`'s **Scan** tab — pick a spot on the map, paste a coordinate pair, or link it directly to a pending citizen report — which queues a row in `pipeline_runs`. A scheduled GitHub Actions job drains that queue automatically every 15 minutes (`python run_pipeline.py --from-queue`; see "Automating the scan queue" below) and pushes any new sites it finds, tagged back to the request that triggered it. Deliberately scoped to detection only — it never touches the basin-wide risk grid, since naively regenerating that from a tiny search area would wipe out the real one.
 
 ## Three Surfaces, One Backend
 
@@ -152,6 +152,22 @@ The web app deploys to Vercel; Supabase hosts everything else and needs no separ
 
    (`AT_WEBHOOK_SECRET`'s name is a holdover from an earlier Africa's Talking integration — it's just the generic SMS-webhook shared secret now, kept as-is so no redeploy config change was needed.)
 
+## Automating the Scan Queue
+
+`.github/workflows/drain-pipeline-queue.yml` runs `python run_pipeline.py --from-queue` every 15 minutes so officer-requested scans (Layer 6) process automatically instead of someone running that command by hand. Earth Engine has no browser to do the interactive `earthengine authenticate` login in CI, so this uses a Google Cloud **service account** instead — set up once:
+
+1. **Create the service account** — Google Cloud Console → IAM & Admin → Service Accounts (under the same project as `EE_PROJECT`) → Create Service Account. Any name (e.g. `g07-pipeline-ci`).
+2. **Grant it Earth Engine access** — give it an Earth Engine IAM role (e.g. Earth Engine Resource Viewer) on that project, and register it for Earth Engine if prompted (Earth Engine service accounts need to be enabled for EE use, similar to how a personal account needs the initial noncommercial signup).
+3. **Create a JSON key** — on that service account, Keys tab → Add Key → Create new key → JSON. This downloads a `.json` file — its full contents are the secret, not a file path.
+4. **Add these as GitHub repository secrets** (repo → Settings → Secrets and variables → Actions → New repository secret):
+   - `SUPABASE_URL` — same value as `NEXT_PUBLIC_SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `EE_PROJECT`
+   - `EE_SERVICE_ACCOUNT_EMAIL` — the service account's email (`...@<project>.iam.gserviceaccount.com`)
+   - `EE_SERVICE_ACCOUNT_KEY` — the entire JSON key file's contents, pasted as one secret
+
+Until those secrets exist, the workflow will fail on `push.get_client()` (missing Supabase config) — harmless, since a queue with nothing in it exits before that point anyway, and no scan has been lost. `detect.py`'s `init_ee()` picks the service-account path automatically whenever both `EE_SERVICE_ACCOUNT_EMAIL`/`EE_SERVICE_ACCOUNT_KEY` are set, and falls back to the normal interactive-auth path otherwise — local/manual runs are unaffected.
+
 ## Data Sources & APIs
 
 | Source | What it provides | Access |
@@ -166,7 +182,7 @@ The web app deploys to Vercel; Supabase hosts everything else and needs no separ
 
 - **Forest reserve boundaries** are a labeled placeholder polygon, not official Ghana Forestry Commission data.
 - **Gold-price multiplier** is stubbed neutral; no live market feed connected.
-- **No automated recurring pipeline runs** — every run is manual (`python run_pipeline.py`), including draining the officer-requested scan queue (`--from-queue`). Fine for the current cadence (land clearing takes months to show up in a 3-month satellite comparison anyway); a scheduled job (e.g. GitHub Actions cron) would be a small addition later.
+- **Whole-basin runs are still manual** (`python run_pipeline.py --basin pra`) — fine for the current cadence, since land clearing takes months to show up in a 3-month satellite comparison anyway. The officer-requested scan queue (`--from-queue`) *is* automated now, on a 15-minute GitHub Actions schedule — see "Automating the scan queue" below.
 - **Targeted scans don't refresh the risk grid** — by design, to avoid a small-radius run wiping out the basin-wide grid (see Layer 6). If a targeted scan should also update nearby risk scores, that needs a proper scoped-delete, not yet built.
 - **Single basin (Pra)** — the config supports two backup basins (Ankobra, Offin) but only Pra has been run for real.
 - **SMS relies on one physical Android phone (httpsms)** — a real single point of failure (dead battery, lost signal, app killed). Fine for a pilot; Africa's Talking (production telecom infrastructure) is the better choice before this is depended on for real. The webhook's httpsms payload parsing also hasn't been exercised against a live message yet — see the comment in `api/reports/route.ts` if the first real report doesn't land.

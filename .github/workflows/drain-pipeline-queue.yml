@@ -1,0 +1,36 @@
+name: Drain pipeline run queue
+
+# Automates what used to be a manual step: an officer requests a targeted
+# scan from /admin's "Scan" tab, and this drains that queue on a schedule
+# instead of someone having to run `python run_pipeline.py --from-queue`
+# by hand. Safe to run often — with an empty queue it just checks
+# Supabase and exits, without ever touching Earth Engine (see
+# run_from_queue()'s ordering in pipeline/run_pipeline.py).
+on:
+  schedule:
+    - cron: "*/15 * * * *" # every 15 minutes
+  workflow_dispatch: {} # manual "Run workflow" button in the Actions tab
+
+jobs:
+  drain-queue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pipeline dependencies
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: Drain the officer-requested scan queue
+        working-directory: pipeline
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EE_PROJECT: ${{ secrets.EE_PROJECT }}
+          EE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.EE_SERVICE_ACCOUNT_EMAIL }}
+          EE_SERVICE_ACCOUNT_KEY: ${{ secrets.EE_SERVICE_ACCOUNT_KEY }}
+        run: python run_pipeline.py --from-queue
