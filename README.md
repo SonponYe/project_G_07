@@ -39,7 +39,7 @@ earthengine authenticate
 python run_pipeline.py --basin pra --dry-run
 ```
 
-Repository layout and the purpose of every file: see [project_breakdown.md](project_breakdown.md).
+Repository layout and the purpose of every file: see [project_breakdown.md](project_breakdown.md). For a deep, function-by-function walkthrough of how the detection algorithm, risk scoring, report corroboration, and the officer Scan tab actually work internally, see its ["How each piece actually works"](project_breakdown.md#how-each-piece-actually-works) section.
 
 ## How It Works — Six Layers
 
